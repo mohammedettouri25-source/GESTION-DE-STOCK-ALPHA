@@ -384,7 +384,11 @@ function edit(p) {
 }
 async function save() { if (!draft.value.name) return shop.notify('Le nom du produit est requis'); await shop.saveProduct(draft.value); productModal.value = false }
 function selectVariant(p) { if (p.variants.length === 1) shop.addCart(p, p.variants[0]); else variantModal.value = p }
-function money(n) { return new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD', maximumFractionDigits: 0 }).format(n) }
+function money(n) {
+  const num = Number(n)
+  if (isNaN(num) || n === null || n === undefined) return '0 MAD'
+  return new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD', maximumFractionDigits: 0 }).format(num)
+}
 const EXPENSE_CATEGORIES = ['Loyer (Rent)', 'Salaires', 'Lumière & Eau (Électricité/Eau)', 'Marketing / Pub (Facebook/TikTok)', 'Livraison & Transport', 'Emballage & Fournitures', 'Achat de Stock', 'Autre']
 
 function addEntry(type) {
@@ -766,7 +770,7 @@ onMounted(async () => {
         <div class="panel orders-list">
           <div v-if="shop.sales.length" class="table">
             <div v-for="sale in shop.sales" :key="sale.id">
-              <span><b>{{sale.number}}</b><small>{{new Date(sale.createdAt).toLocaleString('fr-MA')}}</small></span>
+              <span><b>{{sale.number || '—'}}</b><small>{{sale.createdAt ? new Date(sale.createdAt).toLocaleString('fr-MA') : '—'}}</small></span>
               <span><b>{{sale.customer?.name||'Vente comptoir'}}</b><small v-if="sale.shipment?.tracking">Ozon : {{sale.shipment.tracking}}</small></span>
               <strong>{{money(sale.total)}}</strong>
               <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">

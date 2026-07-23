@@ -26,44 +26,39 @@ export const useShop = defineStore('shop', {
   }),
 
   getters: {
-    inventoryValue: s => s.products.reduce((sum, p) => sum + p.variants.reduce((x, v) => x + v.stock * (p.purchasePrice || 0), 0), 0),
-    lowStock: s => s.products.flatMap(p => p.variants.filter(v => v.stock <= v.min).map(v => ({ ...v, product: p.name, productId: p.id, purchasePrice: p.purchasePrice || 0 }))),
-    todaySales: s => s.sales.filter(x => new Date(x.createdAt).toDateString() === new Date().toDateString()).reduce((n, x) => n + x.total, 0),
-    monthSales: s => s.sales.filter(x => new Date(x.createdAt).getMonth() === new Date().getMonth()).reduce((n, x) => n + x.total, 0),
-    totalExpenses: s => s.expenses.reduce((sum, x) => sum + Number(x.amount || 0), 0),
-    totalSales: s => s.sales.reduce((sum, x) => sum + Number(x.total || 0), 0),
-    totalCOGS: s => s.sales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, i) => {
+    inventoryValue: s => (s.products || []).reduce((sum, p) => sum + (p.variants || []).reduce((x, v) => x + (Number(v.stock) || 0) * (Number(p.purchasePrice) || 0), 0), 0),
+    lowStock: s => (s.products || []).flatMap(p => (p.variants || []).filter(v => (v.stock || 0) <= (v.min || 0)).map(v => ({ ...v, product: p.name, productId: p.id, purchasePrice: p.purchasePrice || 0 }))),
+    todaySales: s => (s.sales || []).filter(x => x && !x.deleted && x.createdAt && new Date(x.createdAt).toDateString() === new Date().toDateString()).reduce((n, x) => n + (Number(x.total) || 0), 0),
+    monthSales: s => (s.sales || []).filter(x => x && !x.deleted && x.createdAt && new Date(x.createdAt).getMonth() === new Date().getMonth()).reduce((n, x) => n + (Number(x.total) || 0), 0),
+    totalExpenses: s => (s.expenses || []).filter(x => x && !x.deleted).reduce((sum, x) => sum + Number(x.amount || 0), 0),
+    totalSales: s => (s.sales || []).filter(x => x && !x.deleted).reduce((sum, x) => sum + Number(x.total || 0), 0),
+    totalCOGS: s => (s.sales || []).filter(x => x && !x.deleted).reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, i) => {
       const p = s.products.find(prod => prod.id === i.productId || prod.sku === i.sku)
-      const cost = i.purchasePrice || p?.purchasePrice || 0
-      return itemSum + cost * i.quantity
+      const cost = Number(i.purchasePrice || p?.purchasePrice || 0)
+      return itemSum + cost * (Number(i.quantity) || 1)
     }, 0), 0),
-    grossProfit: s => s.totalSales - s.sales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, i) => {
-      const p = s.products.find(prod => prod.id === i.productId || prod.sku === i.sku)
-      const cost = i.purchasePrice || p?.purchasePrice || 0
-      return itemSum + cost * i.quantity
-    }, 0), 0),
-    netProfit: s => (s.totalSales - s.sales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, i) => {
-      const p = s.products.find(prod => prod.id === i.productId || prod.sku === i.sku)
-      const cost = i.purchasePrice || p?.purchasePrice || 0
-      return itemSum + cost * i.quantity
-    }, 0), 0)) - s.expenses.reduce((sum, x) => sum + Number(x.amount || 0), 0),
-    profitMargin: s => {
-      const gross = s.totalSales - s.sales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, i) => {
-        const p = s.products.find(prod => prod.id === i.productId || prod.sku === i.sku)
-        const cost = i.purchasePrice || p?.purchasePrice || 0
-        return itemSum + cost * i.quantity
-      }, 0), 0)
-      const net = gross - s.expenses.reduce((sum, x) => sum + Number(x.amount || 0), 0)
-      return s.totalSales ? ((net / s.totalSales) * 100).toFixed(1) : 0
-    },
-    cartTotal: s => s.cart.reduce((n, x) => n + x.price * x.quantity, 0)
+    grossProfit: s => s.totalSales - s.totalCOGS,
+    netProfit: s => s.grossProfit - s.totalExpenses,
+    profitMargin: s => s.totalSales ? ((s.netProfit / s.totalSales) * 100).toFixed(1) : 0,
+    cartTotal: s => (s.cart || []).reduce((n, x) => n + (Number(x.price) || 0) * (Number(x.quantity) || 0), 0)
   },
 
   actions: {
     async init() {
-      // Load local data first for fast startup
+      // Load local data first for fast startup & auto-clean any corrupted/deleted records
       this.products = await localDb.products.toArray()
-      this.sales = await localDb.sales.toArray()
+
+      const rawSales = await localDb.sales.toArray()
+      const validSales = []
+      for (const s of rawSales) {
+        if (!s || !s.id || s.deleted || !s.createdAt) {
+          await localDb.sales.delete(s.id).catch(() => {})
+        } else {
+          validSales.push(s)
+        }
+      }
+      this.sales = validSales
+
       this.customers = await localDb.customers.toArray()
       this.suppliers = await localDb.suppliers?.toArray().catch(() => []) || []
       this.expenses = await localDb.expenses?.toArray().catch(() => []) || []
@@ -457,12 +452,16 @@ export const useShop = defineStore('shop', {
               if (idx < 0) this.products.push(payload)
               else this.products.splice(idx, 1, payload)
             }
-          } else if (entity_type === 'sales' && payload.id) {
-            await localDb.sales.put(payload)
-            // Bug fix: dedup guard — only add if not already in list
-            const idx = this.sales.findIndex(x => x.id === payload.id)
-            if (idx < 0) this.sales.unshift(payload)
-            else this.sales.splice(idx, 1, payload)
+          } else if (entity_type === 'sales') {
+            if (payload.deleted || payload.deleted === true) {
+              await localDb.sales.delete(entity_id)
+              this.sales = this.sales.filter(x => x.id !== entity_id)
+            } else if (payload.id) {
+              await localDb.sales.put(payload)
+              const idx = this.sales.findIndex(x => x.id === payload.id)
+              if (idx < 0) this.sales.unshift(payload)
+              else this.sales.splice(idx, 1, payload)
+            }
           } else if (entity_type === 'customers') {
             if (payload.deleted) {
               await localDb.customers.delete(entity_id)
@@ -528,11 +527,16 @@ export const useShop = defineStore('shop', {
                 if (idx < 0) this.products.push(payload)
                 else this.products.splice(idx, 1, payload)
               }
-            } else if (entity_type === 'sales' && payload.id) {
-              localDb.sales.put(payload)
-              const idx = this.sales.findIndex(x => x.id === payload.id)
-              if (idx < 0) this.sales.unshift(payload)
-              else this.sales.splice(idx, 1, payload)
+            } else if (entity_type === 'sales') {
+              if (payload.deleted || payload.deleted === true) {
+                localDb.sales.delete(entity_id)
+                this.sales = this.sales.filter(x => x.id !== entity_id)
+              } else if (payload.id) {
+                localDb.sales.put(payload)
+                const idx = this.sales.findIndex(x => x.id === payload.id)
+                if (idx < 0) this.sales.unshift(payload)
+                else this.sales.splice(idx, 1, payload)
+              }
             } else if (entity_type === 'customers') {
               if (payload.deleted) {
                 localDb.customers.delete(entity_id)
