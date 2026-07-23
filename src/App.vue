@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useShop } from './stores/shop'
-import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText, Bot, Sparkles, Lock, LogOut, KeyRound, Eye, EyeOff } from 'lucide-vue-next'
+import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText, Bot, Sparkles, Lock, LogOut, KeyRound, Eye, EyeOff, MessageCircle, Send } from 'lucide-vue-next'
 import { createOzonParcel, getOzonParcelInfo } from './services/ozon'
 import { OZON_CITIES } from './services/ozonCities'
 
@@ -57,6 +57,41 @@ function showInvoice(sale) {
 
 function triggerPrint() {
   window.print()
+}
+
+function formatWhatsAppPhone(phone) {
+  if (!phone) return ''
+  let cleaned = String(phone).replace(/\D/g, '')
+  if (cleaned.startsWith('0')) {
+    cleaned = '212' + cleaned.slice(1)
+  } else if (!cleaned.startsWith('212')) {
+    cleaned = '212' + cleaned
+  }
+  return cleaned
+}
+
+function sendWhatsAppOrderMessage(sale) {
+  const c = sale?.customer || {}
+  const phone = formatWhatsAppPhone(c.phone)
+  if (!phone) return shop.notify('Numéro de téléphone client non spécifié')
+
+  const total = money(sale.total)
+  const trackingText = sale.shipment?.tracking ? `\n📦 *N° Suivi Ozon Express :* ${sale.shipment.tracking}` : ''
+  const itemsText = (sale.items || []).map(i => `- ${i.name} (x${i.quantity})`).join('\n')
+
+  const message = `Bonjour ${c.name || 'Cher client'},\n\nVotre commande *${sale.number}* chez *${settings.value.business || 'Alpha Shop07'}* a bien été enregistrée !\n\n📋 *Articles :*\n${itemsText}\n\n💰 *Total à payer :* ${total}${trackingText}\n\nMerci pour votre confiance ! 🙏`
+
+  const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`
+  window.open(url, '_blank')
+}
+
+function sendWhatsAppCustomerMessage(customer) {
+  const phone = formatWhatsAppPhone(customer?.phone)
+  if (!phone) return shop.notify('Numéro de téléphone non valide')
+
+  const message = `Bonjour ${customer.name || ''},\n\nMerci d'avoir choisi *${settings.value.business || 'Alpha Shop07'}* ! N'hésitez pas à nous contacter si vous avez la moindre question.`
+  const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`
+  window.open(url, '_blank')
 }
 
 function parseProductFromText(promptText) {
@@ -569,7 +604,10 @@ onMounted(() => shop.init())
               <span><b>{{sale.number}}</b><small>{{new Date(sale.createdAt).toLocaleString('fr-MA')}}</small></span>
               <span><b>{{sale.customer?.name||'Vente comptoir'}}</b><small v-if="sale.shipment?.tracking">Ozon : {{sale.shipment.tracking}}</small></span>
               <strong>{{money(sale.total)}}</strong>
-              <div style="display:flex; gap:6px; align-items:center;">
+              <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                <button v-if="sale.customer?.phone" class="quiet" style="color:#16a34a; display:flex; gap:4px; align-items:center;" title="Envoyer le récapitulatif sur WhatsApp" @click="sendWhatsAppOrderMessage(sale)">
+                  <MessageCircle :size="14"/> WhatsApp
+                </button>
                 <button class="quiet" @click="showInvoice(sale)" title="Voir et imprimer la facture">
                   <FileText :size="15"/> Facture
                 </button>
@@ -593,7 +631,12 @@ onMounted(() => shop.init())
               <span><b>{{person.name}}</b><small>{{person.phone||person.email||'Aucun contact'}}</small></span>
               <span>{{person.city||person.company||'—'}}</span>
               <strong>{{person.address||person.email||'—'}}</strong>
-              <button class="icon" style="color:#dc2626" @click.stop="deleteEntry(shop.active==='customers'?'customer':'supplier', person.id)"><Trash2 :size="15"/></button>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <button v-if="person.phone" class="icon" style="color:#16a34a;" title="Contacter sur WhatsApp" @click.stop="sendWhatsAppCustomerMessage(person)">
+                  <MessageCircle :size="16"/>
+                </button>
+                <button class="icon" style="color:#dc2626" @click.stop="deleteEntry(shop.active==='customers'?'customer':'supplier', person.id)"><Trash2 :size="15"/></button>
+              </div>
             </div>
           </div>
           <div v-else class="empty">Aucun {{shop.active==='customers'?'client':'fournisseur'}} enregistré pour le moment.</div>
@@ -896,7 +939,10 @@ onMounted(() => shop.init())
       <div class="modal invoice-modal-container" style="max-width:720px; width:100%; padding: 20px; max-height:90vh; overflow-y:auto;">
         <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
           <h3 style="margin:0; font-size:16px;">DOCUMENT DE FACTURE</h3>
-          <div style="display:flex; gap:10px;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <button v-if="activeInvoice.customer?.phone" type="button" class="primary" style="background:#16a34a; border:none; display:flex; gap:6px; align-items:center;" @click="sendWhatsAppOrderMessage(activeInvoice)">
+              <MessageCircle :size="16"/> Envoyer sur WhatsApp 💬
+            </button>
             <button type="button" class="primary" @click="triggerPrint" style="display:flex; gap:6px; align-items:center;">
               <Printer :size="16"/> Imprimer la Facture 🖨️
             </button>
