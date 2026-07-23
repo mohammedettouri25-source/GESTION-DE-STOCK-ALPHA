@@ -384,7 +384,7 @@ async function submitOrder() {
       localStorage.setItem('ozon-customer-id', o.customerId)
       localStorage.setItem('ozon-api-key', o.apiKey)
       try {
-        const cityParam = c.city || c.cityId || 'Casablanca'
+        const cityIdParam = String(c.cityId || '2165')
         const validId = (o.customerId && /^\d+$/.test(o.customerId.trim())) ? o.customerId.trim() : (import.meta.env.VITE_OZON_CUSTOMER_ID || '89381')
         const validKey = (o.apiKey && o.apiKey.length > 5 && !o.apiKey.includes(' ')) ? o.apiKey.trim() : (import.meta.env.VITE_OZON_API_KEY || 'db4545-4ede23-78ef27-868f4a-fa5359')
         const response = await createOzonParcel({
@@ -393,21 +393,20 @@ async function submitOrder() {
           parcel: {
             'parcel-receiver': c.name,
             'parcel-phone': c.phone,
-            'parcel-city': cityParam,
+            'parcel-city': cityIdParam,
             'parcel-address': c.address,
-            'parcel-note': c.note || 'Commande POS',
+            'parcel-note': c.note || 'Appeler avant livraison',
             'parcel-price': sale.total,
-            'parcel-declared-value': o.declaredValue || sale.total,
+            'parcel-declared-value': o.declaredValue || Math.max(50, sale.total),
             'parcel-nature': 'Commande ' + sale.number,
             'parcel-stock': 0,
             'parcel-open': o.open || '1',
             'parcel-fragile': o.fragile || '0',
-            'parcel-replace': o.replace || '0',
-            products: JSON.stringify(sale.items.map(i => ({ ref: i.sku || i.productId, qnty: i.quantity })))
+            'parcel-replace': o.replace || '0'
           }
         })
-        const tracking = response['TRACKING-NUMBER'] || response.tracking || 'Ozon Express'
-        await shop.attachShipment(sale.id, { tracking, city: response.CITY_NAME || cityParam, status: 'created', response })
+        const tracking = response['TRACKING-NUMBER'] || response.tracking || response['NEW-PARCEL']?.['TRACKING-NUMBER'] || 'Ozon Express'
+        await shop.attachShipment(sale.id, { tracking, city: response.CITY_NAME || c.city || 'Casablanca', status: 'created', response })
         shop.notify(`Colis créé Ozon Express : ${tracking}`)
       } catch (error) {
         console.error('Ozon creation error:', error)

@@ -21,7 +21,16 @@ function processOzonResult(body, keyName = 'ADD-PARCEL') {
     const msg = data.MESSAGE || data.error || data.message || 'Erreur Ozon Express'
     throw new Error(msg)
   }
-  return data
+
+  const newParcel = data['NEW-PARCEL'] || data
+  const tracking = newParcel['TRACKING-NUMBER'] || data['TRACKING-NUMBER'] || newParcel.tracking
+
+  return {
+    ...data,
+    ...newParcel,
+    'TRACKING-NUMBER': tracking,
+    tracking
+  }
 }
 
 export async function createOzonParcel({ customerId, apiKey, parcel }) {
