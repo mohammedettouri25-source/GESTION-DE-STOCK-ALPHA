@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useShop } from './stores/shop'
-import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText } from 'lucide-vue-next'
+import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText, Bot, Sparkles } from 'lucide-vue-next'
 import { createOzonParcel, getOzonParcelInfo } from './services/ozon'
 import { OZON_CITIES } from './services/ozonCities'
 
@@ -22,6 +22,9 @@ const checkoutModal = ref(false)
 const submitting = ref(false)
 const invoiceModal = ref(false)
 const activeInvoice = ref(null)
+const aiModal = ref(false)
+const aiPrompt = ref('')
+const aiAnalyzing = ref(false)
 
 function showInvoice(sale) {
   activeInvoice.value = sale
@@ -31,6 +34,116 @@ function showInvoice(sale) {
 function triggerPrint() {
   window.print()
 }
+
+function parseProductFromText(promptText) {
+  const text = promptText.trim()
+  if (!text) return null
+
+  const colorMap = {
+    'noir': 'Noir', 'black': 'Noir', 'khal': 'Noir',
+    'blanc': 'Blanc', 'white': 'Blanc', 'byad': 'Blanc',
+    'rouge': 'Rouge', 'red': 'Rouge', 'hamar': 'Rouge',
+    'bleu': 'Bleu', 'blue': 'Bleu', 'zraq': 'Bleu',
+    'vert': 'Vert', 'green': 'Vert', 'khdar': 'Vert',
+    'jaune': 'Jaune', 'yellow': 'Jaune', 'sfar': 'Jaune',
+    'gris': 'Gris', 'grey': 'Gris',
+    'marron': 'Marron', 'brown': 'Marron', 'qahwi': 'Marron',
+    'rose': 'Rose', 'pink': 'Rose',
+    'orange': 'Orange',
+    'violet': 'Violet', 'purple': 'Violet',
+    'beige': 'Beige',
+    'bordeaux': 'Bordeaux',
+    'marine': 'Bleu Marine',
+    'kaki': 'Kaki'
+  }
+  const words = text.toLowerCase().split(/[\s,;.+]+/)
+  const foundColors = new Set()
+  words.forEach(w => {
+    if (colorMap[w]) foundColors.add(colorMap[w])
+  })
+  const colors = foundColors.size > 0 ? Array.from(foundColors) : ['Noir']
+
+  const knownSizes = ['3xl', '2xl', 'xxl', 'xl', 'l', 'm', 's', 'xs', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46']
+  const foundSizes = new Set()
+  words.forEach(w => {
+    if (knownSizes.includes(w)) {
+      foundSizes.add(w.toUpperCase())
+    }
+  })
+  const sizes = foundSizes.size > 0 ? Array.from(foundSizes) : ['M', 'L']
+
+  let defaultStock = 10
+  const stockMatch = text.match(/(?:stock|qte|quantite|unites?|pieces?)\s*[:=]?\s*(\d+)/i) || text.match(/(\d+)\s*(?:f\s*kull|cada|chacun|unites?|pieces?)/i)
+  if (stockMatch) {
+    defaultStock = parseInt(stockMatch[1], 10) || 10
+  }
+
+  let price = 149
+  let purchasePrice = 65
+
+  const purchaseMatch = text.match(/(?:achat|prix\s*d['’]?achat|cost|chri)\s*[:=]?\s*(\d+)/i) || text.match(/(\d+)\s*(?:dh|mad)?\s*(?:d['’]?achat|achat)/i)
+  if (purchaseMatch) {
+    purchasePrice = parseInt(purchaseMatch[1], 10) || 65
+  }
+
+  const priceMatch = text.match(/(?:prix|vente|price|b3t|bi3)\s*[:=]?\s*(\d+)/i) || text.match(/(\d+)\s*(?:dh|mad)/i)
+  if (priceMatch) {
+    price = parseInt(priceMatch[1], 10) || 149
+  }
+
+  let name = text
+    .replace(/(?:stock|qte|quantite|unites?|pieces?|prix|vente|achat|cost|chri|dh|mad)\s*[:=]?\s*\d+/gi, '')
+    .replace(/\b(\d+)\b/g, '')
+    .trim()
+  if (!name || name.length < 3) name = 'Nouveau Produit AI'
+
+  const skuPrefix = name.slice(0, 3).toUpperCase().replace(/[^A-Z]/g, 'PRD')
+  const randomNum = Math.floor(100 + Math.random() * 900)
+  const sku = `${skuPrefix}-${randomNum}`
+
+  const variants = []
+  colors.forEach(c => {
+    sizes.forEach(sz => {
+      variants.push({
+        color: c,
+        size: sz,
+        stock: defaultStock,
+        min: 2,
+        barcode: '3' + Math.floor(1000000 + Math.random() * 9000000)
+      })
+    })
+  })
+
+  return {
+    name,
+    sku,
+    barcode: '3' + Math.floor(1000000 + Math.random() * 9000000),
+    category: 'Général',
+    brand: 'Alpha',
+    price,
+    purchasePrice,
+    variants
+  }
+}
+
+function processAiAgentProduct() {
+  if (!aiPrompt.value.trim()) return shop.notify('Entrez une description pour l\'agent AI')
+  aiAnalyzing.value = true
+  setTimeout(() => {
+    const generated = parseProductFromText(aiPrompt.value)
+    if (generated) {
+      draft.value = generated
+      aiModal.value = false
+      aiPrompt.value = ''
+      productModal.value = true
+      shop.notify(`🤖 Agent AI : ${generated.variants.length} variante(s) générée(s) !`)
+    } else {
+      shop.notify('Impossible de détecter le produit')
+    }
+    aiAnalyzing.value = false
+  }, 400)
+}
+
 
 const blank = () => ({ name: '', sku: '', barcode: '', category: 'Général', brand: '', price: 0, purchasePrice: 0, variants: [{ color: 'Noir', size: 'Unique', stock: 0, min: 2, barcode: '' }] })
 const draft = ref(blank())
@@ -279,7 +392,12 @@ onMounted(() => shop.init())
       <section v-else-if="shop.active==='products'" class="page">
         <div class="page-head">
           <div><p class="eyebrow">CATALOGUE</p><h1>Produits</h1></div>
-          <button class="primary" @click="edit()"><Plus :size="17"/> Ajouter un produit</button>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="primary" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); border: none;" @click="aiModal = true">
+              <Bot :size="17"/> 🤖 Agent AI (Ajout Auto)
+            </button>
+            <button class="primary" @click="edit()"><Plus :size="17"/> Ajouter un produit</button>
+          </div>
         </div>
         <div class="toolbar">
           <div class="search">
@@ -780,6 +898,53 @@ onMounted(() => shop.init())
             <p style="margin:0; font-size:11px;">Alpha Shop07 — Document généré automatiquement</p>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Agent AI Smart Product Modal -->
+    <div v-if="aiModal" class="overlay" @click.self="aiModal=false">
+      <div class="modal" style="max-width:540px; width:100%; padding:24px;">
+        <div class="modal-head" style="margin-bottom:12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#4f46e5,#7c3aed); color:#fff; display:grid; place-items:center;">
+              <Bot :size="20"/>
+            </div>
+            <div>
+              <h2 style="margin:0; font-size:17px;">Agent AI — Ajout Auto de Produit</h2>
+              <p style="margin:2px 0 0; font-size:12px; color:#666;">Écrivez votre produit en texte brut (Darija / Français)</p>
+            </div>
+          </div>
+          <button type="button" class="icon" @click="aiModal=false"><X/></button>
+        </div>
+
+        <form @submit.prevent="processAiAgentProduct">
+          <label style="display:block; margin-bottom:12px;">
+            <span style="font-weight:600; font-size:13px; margin-bottom:6px; display:block;">Description du produit</span>
+            <textarea
+              v-model="aiPrompt"
+              rows="4"
+              style="width:100%; border:1px solid #ddd; border-radius:8px; padding:10px; font-family:inherit; font-size:13px;"
+              placeholder="Exemple : T-Shirt Nike S M L XL noir blanc prix 180dh achat 80dh stock 15 f kull taille"
+              required
+            ></textarea>
+          </label>
+
+          <div style="background:#f4f4f6; border-radius:8px; padding:12px; margin-bottom:16px; font-size:12px; color:#444;">
+            <b>💡 Conseils pour l'Agent :</b>
+            <ul style="margin:6px 0 0 16px; padding:0; line-height:1.5;">
+              <li>Mentionnez les <b>Couleurs</b> : <i>noir, blanc, bleu, rouge, gris, marron...</i></li>
+              <li>Mentionnez les <b>Tailles</b> : <i>S, M, L, XL, XXL, 38, 39, 40, 41, 42...</i></li>
+              <li>Mentionnez le <b>Prix</b> : <i>150dh vente, 70dh achat, stock 10</i></li>
+            </ul>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="quiet" @click="aiModal=false">Annuler</button>
+            <button class="primary" style="background:linear-gradient(135deg,#4f46e5,#7c3aed); border:none;" :disabled="aiAnalyzing">
+              <Sparkles :size="16"/> {{aiAnalyzing ? 'Analyse par l\'Agent…' : 'Générer le Produit 🚀'}}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
