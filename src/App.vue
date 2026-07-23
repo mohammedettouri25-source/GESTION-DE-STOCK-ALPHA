@@ -39,7 +39,7 @@ const authenticated = ref(localStorage.getItem('alpha-auth') === 'true')
 const loginPassword = ref('')
 const loginError = ref('')
 const showPass = ref(false)
-const masterPin = ref(localStorage.getItem('alpha-pin') || '1234')
+const masterPin = ref(localStorage.getItem('alpha-pin') || 'ALPHASHOP2026@@')
 
 function handleLogin() {
   if (loginPassword.value.trim() === masterPin.value) {
@@ -317,7 +317,7 @@ const supplierList = loadList('alpha-suppliers', [])
 const expenseList = loadList('alpha-expenses', [])
 const entryModal = ref('')
 const entry = ref({})
-const settings = ref({ business: localStorage.getItem('alpha-business') || 'Alpha Shop', currency: 'MAD', ozonId: localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '', ozonKey: localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || '', pin: localStorage.getItem('alpha-pin') || '1234' })
+const settings = ref({ business: localStorage.getItem('alpha-business') || 'Alpha Shop', currency: 'MAD', ozonId: localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '', ozonKey: localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || '', pin: localStorage.getItem('alpha-pin') || 'ALPHASHOP2026@@' })
 const labels = { fr: { title: `Aujourd'hui`, sales: 'Ventes du jour', month: 'Ventes du mois', stock: 'Stock à surveiller', profit: 'Bénéfice estimé' }, ar: { title: 'اليوم', sales: 'مبيعات اليوم', month: 'مبيعات الشهر', stock: 'مخزون منخفض', profit: 'الربح المقدر' } }
 const t = computed(() => labels[shop.language])
 const filtered = computed(() => shop.products.filter(p => `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(shop.query.toLowerCase())))
@@ -480,7 +480,7 @@ onMounted(async () => {
             <input
               v-model="loginPassword"
               :type="showPass ? 'text' : 'password'"
-              placeholder="Entrez votre PIN (Ex: 1234)"
+              placeholder="Entrez votre mot de passe"
               required
               autofocus
             />
@@ -499,10 +499,6 @@ onMounted(async () => {
           <Lock :size="18"/> Se Connecter à Alpha Shop 🔒
         </button>
       </form>
-
-      <div class="login-footer">
-        <small>Code PIN par défaut : <b>1234</b> (Modifiable dans Réglages)</small>
-      </div>
     </div>
   </div>
 
@@ -833,8 +829,8 @@ onMounted(async () => {
           </div>
           <div>
             <h2>Sécurité & Accès</h2>
-            <label>Code PIN / Mot de passe du Dashboard (Par défaut : 1234)
-              <input v-model="settings.pin" type="text" placeholder="Ex: 1234"/>
+            <label>Code PIN / Mot de passe du Dashboard
+              <input v-model="settings.pin" type="text" placeholder="Ex: ALPHASHOP2026@@"/>
             </label>
           </div>
           <div class="modal-actions">
