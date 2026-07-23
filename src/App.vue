@@ -51,12 +51,38 @@ function edit(p) { draft.value = p ? structuredClone(p) : blank(); productModal.
 async function save() { if (!draft.value.name) return shop.notify('Le nom du produit est requis'); await shop.saveProduct(draft.value); productModal.value = false }
 function selectVariant(p) { if (p.variants.length === 1) shop.addCart(p, p.variants[0]); else variantModal.value = p }
 function money(n) { return new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD', maximumFractionDigits: 0 }).format(n) }
-// Bug fix: use .value for reactive refs
-const totalExpenses = computed(() => expenseList.value.reduce((sum, x) => sum + Number(x.amount || 0), 0))
-const totalSales = computed(() => shop.sales.reduce((sum, x) => sum + Number(x.total || 0), 0))
-function addEntry(type) { entryModal.value = type; entry.value = type === 'customer' ? { name: '', phone: '', city: '', address: '' } : type === 'supplier' ? { name: '', phone: '', company: '', email: '' } : { category: 'Autre', amount: 0, note: '', date: new Date().toISOString().slice(0, 10) } }
-function saveEntry() { const map = { customer: ['alpha-customers', customerList], supplier: ['alpha-suppliers', supplierList], expense: ['alpha-expenses', expenseList] }; const [key, list] = map[entryModal.value]; list.value.unshift({ id: crypto.randomUUID(), ...entry.value }); localStorage.setItem(key, JSON.stringify(list.value)); shop.notify('Enregistré'); entryModal.value = '' }
-function deleteEntry(type, id) { const map = { customer: ['alpha-customers', customerList], supplier: ['alpha-suppliers', supplierList], expense: ['alpha-expenses', expenseList] }; const [key, list] = map[type]; list.value = list.value.filter(x => x.id !== id); localStorage.setItem(key, JSON.stringify(list.value)); shop.notify('Supprimé') }
+const EXPENSE_CATEGORIES = ['Loyer (Rent)', 'Salaires', 'Lumière & Eau (Électricité/Eau)', 'Marketing / Pub (Facebook/TikTok)', 'Livraison & Transport', 'Emballage & Fournitures', 'Achat de Stock', 'Autre']
+
+function addEntry(type) {
+  entryModal.value = type
+  entry.value = type === 'customer'
+    ? { name: '', phone: '', city: '', address: '' }
+    : type === 'supplier'
+      ? { name: '', phone: '', company: '', email: '' }
+      : { category: 'Loyer (Rent)', amount: 0, note: '', date: new Date().toISOString().slice(0, 10) }
+}
+
+async function saveEntry() {
+  if (entryModal.value === 'customer') {
+    if (!entry.value.name) return shop.notify('Nom du client requis')
+    await shop.saveCustomer(entry.value)
+  } else if (entryModal.value === 'supplier') {
+    if (!entry.value.name) return shop.notify('Nom du fournisseur requis')
+    await shop.saveSupplier(entry.value)
+  } else if (entryModal.value === 'expense') {
+    if (!entry.value.amount || entry.value.amount <= 0) return shop.notify('Montant invalide')
+    await shop.saveExpense(entry.value)
+  }
+  entryModal.value = ''
+}
+
+async function deleteEntry(type, id) {
+  if (confirm('Voulez-vous vraiment supprimer cet élément ?')) {
+    if (type === 'customer') await shop.removeCustomer(id)
+    else if (type === 'supplier') await shop.removeSupplier(id)
+    else if (type === 'expense') await shop.removeExpense(id)
+  }
+}
 function saveSettings() { localStorage.setItem('alpha-business', settings.value.business); localStorage.setItem('ozon-customer-id', settings.value.ozonId); localStorage.setItem('ozon-api-key', settings.value.ozonKey); shop.notify('Réglages enregistrés') }
 function exportSales() { const rows = ['Numéro;Date;Total;Paiement;Client', ...shop.sales.map(s => `${s.number};${new Date(s.createdAt).toLocaleDateString('fr-MA')};${s.total};${s.payment};${s.customer?.name||'Comptoir'}`)]; const url = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement('a'); a.href = url; a.download = `rapport-ventes-${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url) }
 function openCheckout() { if (!shop.cart.length) return shop.notify('Ajoutez au moins un article au panier'); mobileCartSheet.value = false; checkoutModal.value = true }
@@ -318,63 +344,64 @@ onMounted(() => shop.init())
       <section v-else-if="shop.active==='customers'||shop.active==='suppliers'" class="page">
         <div class="page-head">
           <div><p class="eyebrow">RÉPERTOIRE</p><h1>{{shop.active==='customers'?'Clients':'Fournisseurs'}}</h1></div>
-          <button class="primary" @click="addEntry(shop.active==='customers'?'customer':'supplier')"><Plus :size="17"/> Ajouter</button>
+          <button class="primary" @click="addEntry(shop.active==='customers'?'customer':'supplier')"><Plus :size="17"/> Ajouter {{shop.active==='customers'?'un client':'un fournisseur'}}</button>
         </div>
         <div class="panel directory">
-          <div v-if="(shop.active==='customers'?customerList.value:supplierList.value).length" class="table">
-            <div v-for="person in (shop.active==='customers'?customerList.value:supplierList.value)" :key="person.id">
+          <div v-if="(shop.active==='customers'?shop.customers:shop.suppliers).length" class="table">
+            <div v-for="person in (shop.active==='customers'?shop.customers:shop.suppliers)" :key="person.id">
               <span><b>{{person.name}}</b><small>{{person.phone||person.email||'Aucun contact'}}</small></span>
               <span>{{person.city||person.company||'—'}}</span>
-              <strong>{{person.address||'—'}}</strong>
-              <button class="icon" style="color:#999" @click.stop="deleteEntry(shop.active==='customers'?'customer':'supplier', person.id)"><Trash2 :size="14"/></button>
+              <strong>{{person.address||person.email||'—'}}</strong>
+              <button class="icon" style="color:#dc2626" @click.stop="deleteEntry(shop.active==='customers'?'customer':'supplier', person.id)"><Trash2 :size="15"/></button>
             </div>
           </div>
-          <div v-else class="empty">Ajoutez {{shop.active==='customers'?'un client':'un fournisseur'}} pour commencer.</div>
+          <div v-else class="empty">Aucun {{shop.active==='customers'?'client':'fournisseur'}} enregistré pour le moment.</div>
         </div>
       </section>
 
       <!-- Finance View -->
       <section v-else-if="shop.active==='finance'" class="page">
         <div class="page-head">
-          <div><p class="eyebrow">TRÉSORERIE</p><h1>Finance</h1></div>
+          <div><p class="eyebrow">TRÉSORERIE & DÉPENSES</p><h1>Finance</h1></div>
           <button class="primary" @click="addEntry('expense')"><Plus :size="17"/> Ajouter une dépense</button>
         </div>
         <div class="metrics finance-metrics">
-          <article><small>Encaissements</small><strong>{{money(totalSales)}}</strong></article>
-          <article><small>Dépenses</small><strong>{{money(totalExpenses)}}</strong></article>
-          <article><small>Solde net</small><strong>{{money(totalSales-totalExpenses)}}</strong></article>
+          <article><small>Ventes Totales (Encaissements)</small><strong>{{money(shop.totalSales)}}</strong></article>
+          <article><small>Total Dépenses</small><strong style="color: #dc2626;">{{money(shop.totalExpenses)}}</strong></article>
+          <article><small>Solde Net (Profit)</small><strong :style="{ color: shop.netProfit >= 0 ? '#16a34a' : '#dc2626' }">{{money(shop.netProfit)}}</strong></article>
+          <article><small>Valeur du Stock</small><strong>{{money(shop.inventoryValue)}}</strong></article>
         </div>
         <div class="panel">
           <div class="panel-title">
-            <div><h2>Dépenses récentes</h2><p>Salaires, loyer, publicité, livraison</p></div>
+            <div><h2>Journal des Dépenses</h2><p>Loyer, salaires, électricité, publicité, livraison...</p></div>
           </div>
-          <div v-if="expenseList.value.length" class="table">
-            <div v-for="expense in expenseList.value" :key="expense.id">
+          <div v-if="shop.expenses.length" class="table">
+            <div v-for="expense in shop.expenses" :key="expense.id">
               <span><b>{{expense.category}}</b><small>{{expense.date}}</small></span>
               <span>{{expense.note||'—'}}</span>
-              <strong>{{money(expense.amount)}}</strong>
-              <button class="icon" style="color:#999" @click.stop="deleteEntry('expense', expense.id)"><Trash2 :size="14"/></button>
+              <strong style="color: #dc2626;">-{{money(expense.amount)}}</strong>
+              <button class="icon" style="color:#dc2626" @click.stop="deleteEntry('expense', expense.id)"><Trash2 :size="15"/></button>
             </div>
           </div>
-          <div v-else class="empty">Aucune dépense enregistrée.</div>
+          <div v-else class="empty">Aucune dépense enregistrée. Cliquez sur "Ajouter une dépense".</div>
         </div>
       </section>
 
       <!-- Reports View -->
       <section v-else-if="shop.active==='reports'" class="page">
         <div class="page-head">
-          <div><p class="eyebrow">ANALYSE</p><h1>Rapports</h1></div>
-          <button class="primary" @click="exportSales">Exporter les ventes CSV</button>
+          <div><p class="eyebrow">ANALYSE & RAPPORTS</p><h1>Rapports & Statistiques</h1></div>
+          <button class="primary" @click="exportSales">Exporter le rapport CSV</button>
         </div>
         <div class="metrics">
-          <article><small>Ventes totales</small><strong>{{money(totalSales)}}</strong></article>
-          <article><small>Commandes</small><strong>{{shop.sales.length}}</strong></article>
-          <article><small>Produits en alerte</small><strong>{{shop.lowStock.length}}</strong></article>
-          <article><small>Valeur du stock</small><strong>{{money(shop.inventoryValue)}}</strong></article>
+          <article><small>Ventes Totales</small><strong>{{money(shop.totalSales)}}</strong></article>
+          <article><small>Commandes Effectuées</small><strong>{{shop.sales.length}}</strong></article>
+          <article><small>Panier Moyen</small><strong>{{money(shop.sales.length ? shop.totalSales / shop.sales.length : 0)}}</strong></article>
+          <article><small>Stock en Alerte</small><strong :class="{ danger: shop.lowStock.length > 0 }">{{shop.lowStock.length}} produits</strong></article>
         </div>
         <div class="panel module">
-          <h2>Rapport de ventes</h2>
-          <p>Les indicateurs sont calculés à partir des ventes enregistrées dans le point de vente. Exportez le fichier CSV pour Excel.</p>
+          <h2>Synthèse d'activité</h2>
+          <p>Les indicateurs sont calculés en temps réel depuis votre base de données. Vous pouvez exporter un fichier CSV pour Excel ou Google Sheets.</p>
         </div>
       </section>
 
@@ -600,11 +627,15 @@ onMounted(() => shop.init())
         </template>
         <template v-else>
           <div class="two">
-            <label>Catégorie<input v-model="entry.category" required/></label>
-            <label>Montant MAD<input v-model.number="entry.amount" type="number" min="0" required/></label>
+            <label>Catégorie de Dépense
+              <select v-model="entry.category" required>
+                <option v-for="cat in EXPENSE_CATEGORIES" :key="cat" :value="cat">{{ cat }}</option>
+              </select>
+            </label>
+            <label>Montant (MAD)<input v-model.number="entry.amount" type="number" min="0" required/></label>
           </div>
           <label>Date<input v-model="entry.date" type="date"/></label>
-          <label>Note<input v-model="entry.note"/></label>
+          <label>Note / Description<input v-model="entry.note" placeholder="Ex: Loyer du mois, Pub Facebook, etc."/></label>
         </template>
         <div class="modal-actions">
           <button type="button" class="quiet" @click="entryModal=''">Annuler</button>

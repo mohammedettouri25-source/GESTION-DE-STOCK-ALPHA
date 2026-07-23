@@ -15,6 +15,8 @@ export const useShop = defineStore('shop', {
     products: [],
     sales: [],
     customers: [],
+    suppliers: [],
+    expenses: [],
     cart: [],
     query: '',
     online: navigator.onLine,
@@ -28,6 +30,9 @@ export const useShop = defineStore('shop', {
     lowStock: s => s.products.flatMap(p => p.variants.filter(v => v.stock <= v.min).map(v => ({ ...v, product: p.name }))),
     todaySales: s => s.sales.filter(x => new Date(x.createdAt).toDateString() === new Date().toDateString()).reduce((n, x) => n + x.total, 0),
     monthSales: s => s.sales.filter(x => new Date(x.createdAt).getMonth() === new Date().getMonth()).reduce((n, x) => n + x.total, 0),
+    totalExpenses: s => s.expenses.reduce((sum, x) => sum + Number(x.amount || 0), 0),
+    totalSales: s => s.sales.reduce((sum, x) => sum + Number(x.total || 0), 0),
+    netProfit: s => s.sales.reduce((sum, x) => sum + Number(x.total || 0), 0) - s.expenses.reduce((sum, x) => sum + Number(x.amount || 0), 0),
     cartTotal: s => s.cart.reduce((n, x) => n + x.price * x.quantity, 0)
   },
 
@@ -37,6 +42,8 @@ export const useShop = defineStore('shop', {
       this.products = await localDb.products.toArray()
       this.sales = await localDb.sales.toArray()
       this.customers = await localDb.customers.toArray()
+      this.suppliers = await localDb.suppliers?.toArray().catch(() => []) || []
+      this.expenses = await localDb.expenses?.toArray().catch(() => []) || []
 
       // Pull from Supabase BEFORE seeding — so cross-browser data takes priority
       if (navigator.onLine) {
@@ -338,11 +345,36 @@ export const useShop = defineStore('shop', {
             const idx = this.sales.findIndex(x => x.id === payload.id)
             if (idx < 0) this.sales.unshift(payload)
             else this.sales.splice(idx, 1, payload)
-          } else if (entity_type === 'customers' && payload.id) {
-            await localDb.customers.put(payload)
-            const idx = this.customers.findIndex(x => x.id === payload.id)
-            if (idx < 0) this.customers.unshift(payload)
-            else this.customers.splice(idx, 1, payload)
+          } else if (entity_type === 'customers') {
+            if (payload.deleted) {
+              await localDb.customers.delete(entity_id)
+              this.customers = this.customers.filter(x => x.id !== entity_id)
+            } else if (payload.id) {
+              await localDb.customers.put(payload)
+              const idx = this.customers.findIndex(x => x.id === payload.id)
+              if (idx < 0) this.customers.unshift(payload)
+              else this.customers.splice(idx, 1, payload)
+            }
+          } else if (entity_type === 'suppliers') {
+            if (payload.deleted) {
+              await localDb.suppliers?.delete(entity_id).catch(() => {})
+              this.suppliers = this.suppliers.filter(x => x.id !== entity_id)
+            } else if (payload.id) {
+              await localDb.suppliers?.put(payload).catch(() => {})
+              const idx = this.suppliers.findIndex(x => x.id === payload.id)
+              if (idx < 0) this.suppliers.unshift(payload)
+              else this.suppliers.splice(idx, 1, payload)
+            }
+          } else if (entity_type === 'expenses') {
+            if (payload.deleted) {
+              await localDb.expenses?.delete(entity_id).catch(() => {})
+              this.expenses = this.expenses.filter(x => x.id !== entity_id)
+            } else if (payload.id) {
+              await localDb.expenses?.put(payload).catch(() => {})
+              const idx = this.expenses.findIndex(x => x.id === payload.id)
+              if (idx < 0) this.expenses.unshift(payload)
+              else this.expenses.splice(idx, 1, payload)
+            }
           }
         }
 
@@ -388,6 +420,105 @@ export const useShop = defineStore('shop', {
           .subscribe()
       } catch (e) {
         console.warn('Realtime subscription error:', e.message)
+      }
+    },
+
+    async saveCustomer(customer) {
+      try {
+        const c = {
+          ...customer,
+          id: customer.id || crypto.randomUUID(),
+          name: customer.name || '',
+          phone: customer.phone || '',
+          city: customer.city || '',
+          address: customer.address || '',
+          createdAt: customer.createdAt || new Date().toISOString()
+        }
+        await localDb.customers.put(c)
+        const idx = this.customers.findIndex(x => x.id === c.id)
+        if (idx < 0) this.customers.unshift(c)
+        else this.customers.splice(idx, 1, c)
+        await this.queue('customers', c)
+        this.notify('Client enregistré ✓')
+      } catch (err) {
+        this.notify(`Erreur : ${err.message}`)
+      }
+    },
+
+    async removeCustomer(id) {
+      try {
+        await localDb.customers.delete(id)
+        this.customers = this.customers.filter(x => x.id !== id)
+        await this.queue('customers', { id, deleted: true })
+        this.notify('Client supprimé')
+      } catch (err) {
+        this.notify(`Erreur : ${err.message}`)
+      }
+    },
+
+    async saveSupplier(supplier) {
+      try {
+        const s = {
+          ...supplier,
+          id: supplier.id || crypto.randomUUID(),
+          name: supplier.name || '',
+          phone: supplier.phone || '',
+          company: supplier.company || '',
+          email: supplier.email || '',
+          createdAt: supplier.createdAt || new Date().toISOString()
+        }
+        await localDb.suppliers?.put(s).catch(() => {})
+        const idx = this.suppliers.findIndex(x => x.id === s.id)
+        if (idx < 0) this.suppliers.unshift(s)
+        else this.suppliers.splice(idx, 1, s)
+        await this.queue('suppliers', s)
+        this.notify('Fournisseur enregistré ✓')
+      } catch (err) {
+        this.notify(`Erreur : ${err.message}`)
+      }
+    },
+
+    async removeSupplier(id) {
+      try {
+        await localDb.suppliers?.delete(id).catch(() => {})
+        this.suppliers = this.suppliers.filter(x => x.id !== id)
+        await this.queue('suppliers', { id, deleted: true })
+        this.notify('Fournisseur supprimé')
+      } catch (err) {
+        this.notify(`Erreur : ${err.message}`)
+      }
+    },
+
+    async saveExpense(expense) {
+      try {
+        const e = {
+          ...expense,
+          id: expense.id || crypto.randomUUID(),
+          category: expense.category || 'Autre',
+          amount: Number(expense.amount) || 0,
+          note: expense.note || '',
+          date: expense.date || new Date().toISOString().slice(0, 10),
+          createdAt: expense.createdAt || new Date().toISOString()
+        }
+        await localDb.expenses?.put(e).catch(() => {})
+        const idx = this.expenses.findIndex(x => x.id === e.id)
+        if (idx < 0) this.expenses.unshift(e)
+        else this.expenses.splice(idx, 1, e)
+        await this.queue('expenses', e)
+        this.notify('Dépense enregistrée ✓')
+      } catch (err) {
+        this.notify(`Erreur : ${err.message}`)
+      }
+    },
+
+    async removeExpense(id) {
+      try {
+        await localDb.expenses?.delete(id).catch(() => {})
+        this.expenses = this.expenses.filter(x => x.id !== id)
+        await this.queue('expenses', { id, deleted: true })
+        this.notify('Dépense supprimée')
+      } catch (err) {
+        this.notify(`Erreur : ${err.message}`)
       }
     },
 
