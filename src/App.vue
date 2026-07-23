@@ -58,6 +58,28 @@ const checkoutModal = ref(false)
 const submitting = ref(false)
 const invoiceModal = ref(false)
 const activeInvoice = ref(null)
+const editSaleModal = ref(null)
+const deleteSaleModal = ref(null)
+
+function openEditSale(sale) {
+  editSaleModal.value = JSON.parse(JSON.stringify(sale))
+}
+
+async function saveEditSale() {
+  if (!editSaleModal.value) return
+  await shop.updateSale(editSaleModal.value)
+  editSaleModal.value = null
+}
+
+function confirmDeleteSale(sale) {
+  deleteSaleModal.value = sale
+}
+
+async function executeDeleteSale(restoreStock) {
+  if (!deleteSaleModal.value) return
+  await shop.removeSale(deleteSaleModal.value.id, restoreStock)
+  deleteSaleModal.value = null
+}
 const aiModal = ref(false)
 const aiPrompt = ref('')
 const aiAnalyzing = ref(false)
@@ -754,6 +776,12 @@ onMounted(async () => {
                 <button class="quiet" @click="showInvoice(sale)" title="Voir et imprimer la facture">
                   <FileText :size="15"/> Facture
                 </button>
+                <button class="quiet" style="color:#3b82f6;" @click="openEditSale(sale)" title="Modifier la commande / Changement de prix">
+                  ✏️ Modifier / Prix
+                </button>
+                <button class="quiet danger" style="color:#ef4444; display:flex; gap:4px; align-items:center;" @click="confirmDeleteSale(sale)" title="Supprimer la commande (Retour produit)">
+                  <Trash2 :size="14"/> Supprimer
+                </button>
                 <button v-if="sale.shipment?.tracking" class="quiet" @click="verifyShipment(sale)">Vérifier Ozon</button>
               </div>
             </div>
@@ -1234,6 +1262,88 @@ onMounted(async () => {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Edit Order / Price Change Modal -->
+    <div v-if="editSaleModal" class="overlay" @click.self="editSaleModal = null">
+      <div class="modal card" style="max-width: 500px; width: 100%; padding: 24px; background: #fff; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+        <div class="modal-head" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+          <h2 style="margin: 0; font-size: 18px;">Modifier la Vente {{ editSaleModal.number }}</h2>
+          <button type="button" class="icon" @click="editSaleModal = null"><X :size="18"/></button>
+        </div>
+        <form @submit.prevent="saveEditSale">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+            <label style="display: block;">
+              <span style="font-weight: 600; font-size: 13px; margin-bottom: 4px; display: block;">Mode de paiement</span>
+              <select v-model="editSaleModal.payment" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
+                <option value="Espèces">Espèces</option>
+                <option value="Carte">Carte</option>
+                <option value="Virement">Virement</option>
+              </select>
+            </label>
+            <label style="display: block;">
+              <span style="font-weight: 600; font-size: 13px; margin-bottom: 4px; display: block;">Statut de la commande</span>
+              <select v-model="editSaleModal.status" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
+                <option value="completed">Complétée</option>
+                <option value="pending">En attente</option>
+                <option value="returned">Retourné (Retour)</option>
+              </select>
+            </label>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+            <label style="display: block;">
+              <span style="font-weight: 600; font-size: 13px; margin-bottom: 4px; display: block;">Réduction (MAD)</span>
+              <input v-model.number="editSaleModal.discount" type="number" min="0" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd;"/>
+            </label>
+            <label style="display: block;">
+              <span style="font-weight: 600; font-size: 13px; margin-bottom: 4px; display: block;">Frais de livraison (MAD)</span>
+              <input v-model.number="editSaleModal.shipping" type="number" min="0" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd;"/>
+            </label>
+          </div>
+          <label style="display: block; margin-bottom: 12px;">
+            <span style="font-weight: 600; font-size: 13px; margin-bottom: 4px; display: block;">Prix Total Final (MAD)</span>
+            <input v-model.number="editSaleModal.total" type="number" min="0" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd; font-weight: 700; font-size: 15px;"/>
+          </label>
+          <div v-if="editSaleModal.customer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+            <label style="display: block;">
+              <span style="font-weight: 600; font-size: 13px; margin-bottom: 4px; display: block;">Nom du client</span>
+              <input v-model="editSaleModal.customer.name" placeholder="Nom du client" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd;"/>
+            </label>
+            <label style="display: block;">
+              <span style="font-weight: 600; font-size: 13px; margin-bottom: 4px; display: block;">Téléphone</span>
+              <input v-model="editSaleModal.customer.phone" placeholder="Téléphone" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd;"/>
+            </label>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+            <button type="button" class="quiet" @click="editSaleModal = null">Annuler</button>
+            <button type="submit" class="primary">Enregistrer les modifications ✓</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete / Return Order Confirmation Modal -->
+    <div v-if="deleteSaleModal" class="overlay" @click.self="deleteSaleModal = null">
+      <div class="modal card" style="max-width: 460px; width: 100%; padding: 24px; background: #fff; border-radius: 12px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+        <div style="width: 48px; height: 48px; border-radius: 50%; background: #fee2e2; color: #ef4444; display: grid; place-items: center; margin: 0 auto 12px;">
+          <AlertTriangle :size="24"/>
+        </div>
+        <h2 style="margin: 0 0 8px; font-size: 18px; color: #18181b;">Supprimer la commande {{ deleteSaleModal.number }}</h2>
+        <p style="font-size: 13px; color: #71717a; margin-bottom: 20px; line-height: 1.5;">
+          En cas de retour produit (Retour), vous pouvez restituer automatiquement les articles au stock de votre magasin.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button type="button" class="primary" style="background: #16a34a; border-color: #16a34a; font-weight: 600;" @click="executeDeleteSale(true)">
+            🔄 Supprimer ET Réintégrer les articles au stock (Retour)
+          </button>
+          <button type="button" class="quiet danger" style="color: #ef4444; border: 1px solid #fee2e2; font-weight: 600;" @click="executeDeleteSale(false)">
+            🗑️ Supprimer la commande sans toucher au stock
+          </button>
+          <button type="button" class="quiet" style="margin-top: 4px;" @click="deleteSaleModal = null">
+            Annuler
+          </button>
+        </div>
       </div>
     </div>
   </div>

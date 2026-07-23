@@ -283,6 +283,97 @@ export const useShop = defineStore('shop', {
       await this.queue('sales', sale)
     },
 
+    async removeSale(saleId, restoreStock = true) {
+      try {
+        const index = this.sales.findIndex(s => s.id === saleId)
+        if (index < 0) return
+
+        const sale = this.sales[index]
+
+        // Restituer le stock en cas de retour / annulation
+        if (restoreStock && Array.isArray(sale.items)) {
+          for (const item of sale.items) {
+            const pIdx = this.products.findIndex(x => x.id === item.productId || x.sku === item.sku)
+            if (pIdx >= 0) {
+              const p = this.products[pIdx]
+              const vIdx = p.variants.findIndex(x => x.id === item.variantId)
+              if (vIdx >= 0) {
+                const updatedVariants = p.variants.map((v, i) =>
+                  i === vIdx ? { ...v, stock: v.stock + (Number(item.quantity) || 1) } : { ...v }
+                )
+                const updatedProduct = { ...p, variants: updatedVariants }
+                this.products.splice(pIdx, 1, updatedProduct)
+
+                await localDb.products.put(updatedProduct)
+                await this.queue('products', updatedProduct)
+                await localDb.movements.add({
+                  id: crypto.randomUUID(),
+                  productId: p.id,
+                  type: 'return',
+                  quantity: Number(item.quantity) || 1,
+                  createdAt: new Date().toISOString()
+                })
+              }
+            }
+          }
+        }
+
+        await localDb.sales.delete(saleId)
+        this.sales.splice(index, 1)
+
+        await this.queue('sales', { id: saleId, deleted: true })
+
+        if (supabase) {
+          supabase.from('sales').delete().eq('id', saleId).then(() => {}).catch(() => {})
+        }
+
+        this.notify(restoreStock ? 'Commande supprimée & stock réintégré ✓' : 'Commande supprimée ✓')
+      } catch (error) {
+        console.error('removeSale error:', error)
+        this.notify(`Erreur : ${error.message}`)
+      }
+    },
+
+    async updateSale(updatedSale) {
+      try {
+        const index = this.sales.findIndex(s => s.id === updatedSale.id)
+        if (index < 0) return
+
+        const subtotal = updatedSale.subtotal || (updatedSale.items || []).reduce((n, x) => n + (x.price * x.quantity), 0)
+        const discount = Math.max(0, Number(updatedSale.discount) || 0)
+        const shipping = Math.max(0, Number(updatedSale.shipping) || 0)
+        const total = Number(updatedSale.total) >= 0 ? Number(updatedSale.total) : Math.max(0, subtotal - discount + shipping)
+
+        const saleToSave = {
+          ...updatedSale,
+          subtotal,
+          discount,
+          shipping,
+          total,
+          updatedAt: new Date().toISOString()
+        }
+
+        await localDb.sales.put(saleToSave)
+        this.sales.splice(index, 1, saleToSave)
+
+        await this.queue('sales', saleToSave)
+
+        if (supabase) {
+          supabase.from('sales').upsert({
+            id: saleToSave.id,
+            number: saleToSave.number || '',
+            total: saleToSave.total,
+            payment_method: saleToSave.payment || 'cash'
+          }, { onConflict: 'id' }).then(() => {}).catch(() => {})
+        }
+
+        this.notify(`Commande ${saleToSave.number} mise à jour ✓`)
+      } catch (error) {
+        console.error('updateSale error:', error)
+        this.notify(`Erreur : ${error.message}`)
+      }
+    },
+
     async queue(table, payload) {
       await localDb.queue.add({ table, payload, createdAt: new Date().toISOString() })
       if (this.online) this.sync()
