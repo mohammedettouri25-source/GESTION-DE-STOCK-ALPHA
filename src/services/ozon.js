@@ -14,6 +14,16 @@ async function serverRequest(payload) {
   return body
 }
 
+function processOzonResult(body, keyName = 'ADD-PARCEL') {
+  const data = body?.[keyName] || body || {}
+  
+  if (data.RESULT === 'ERROR' || data.STATUS === 'ERROR' || data.error) {
+    const msg = data.MESSAGE || data.error || data.message || 'Erreur Ozon Express'
+    throw new Error(msg)
+  }
+  return data
+}
+
 export async function createOzonParcel({ customerId, apiKey, parcel }) {
   const cId = customerId || localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID
   const key = apiKey || localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY
@@ -22,9 +32,9 @@ export async function createOzonParcel({ customerId, apiKey, parcel }) {
     throw new Error('Renseignez votre ID Client et votre clé API Ozon Express')
   }
 
-  // Attempt Vercel serverless proxy first, fall back to direct request if route fails
+  let body
   try {
-    return await serverRequest({ action: 'add-parcel', customerId: cId, apiKey: key, parcel })
+    body = await serverRequest({ action: 'add-parcel', customerId: cId, apiKey: key, parcel })
   } catch (error) {
     console.warn('Vercel API proxy route error, attempting direct client request:', error.message)
     const form = new FormData()
@@ -34,12 +44,13 @@ export async function createOzonParcel({ customerId, apiKey, parcel }) {
       }
     })
     const response = await fetch(endpoint(cId, key, 'add-parcel'), { method: 'POST', body: form })
-    const body = await response.json().catch(() => ({}))
+    body = await response.json().catch(() => ({}))
     if (!response.ok) {
       throw new Error(body.message || body.error || `Ozon Express a retourné ${response.status}`)
     }
-    return body
   }
+
+  return processOzonResult(body, 'ADD-PARCEL')
 }
 
 export async function getOzonParcelInfo({ customerId, apiKey, trackingNumber }) {
@@ -50,17 +61,19 @@ export async function getOzonParcelInfo({ customerId, apiKey, trackingNumber }) 
     throw new Error('ID Client, clé API et numéro de suivi requis')
   }
 
+  let body
   try {
-    return await serverRequest({ action: 'parcel-info', customerId: cId, apiKey: key, trackingNumber })
+    body = await serverRequest({ action: 'parcel-info', customerId: cId, apiKey: key, trackingNumber })
   } catch (error) {
     console.warn('Vercel API proxy route error, attempting direct client request:', error.message)
     const form = new FormData()
     form.append('tracking-number', trackingNumber)
     const response = await fetch(endpoint(cId, key, 'parcel-info'), { method: 'POST', body: form })
-    const body = await response.json().catch(() => ({}))
+    body = await response.json().catch(() => ({}))
     if (!response.ok) {
       throw new Error(body.message || body.error || `Ozon Express a retourné ${response.status}`)
     }
-    return body
   }
+
+  return processOzonResult(body, 'PARCEL-INFO')
 }

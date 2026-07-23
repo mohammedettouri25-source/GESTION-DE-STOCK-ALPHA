@@ -31,7 +31,7 @@ async function removeCurrentProduct() {
     productModal.value = false
   }
 }
-const order = ref({ discount: 0, shipping: 0, customer: { name: '', phone: '', cityId: '', city: '', address: '', note: '' }, sendOzon: false, ozon: { customerId: localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '', apiKey: localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || '', declaredValue: '', open: '1', fragile: '0', replace: '0' } })
+const order = ref({ discount: 0, shipping: 0, customer: { name: '', phone: '', cityId: '', city: '', address: '', note: '' }, sendOzon: true, ozon: { customerId: localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '89381', apiKey: localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || 'db4545-4ede23-78ef27-868f4a-fa5359', declaredValue: '', open: '1', fragile: '0', replace: '0' } })
 const nav = [['dashboard', `Vue d'ensemble`, LayoutDashboard], ['products', 'Produits', Package], ['pos', 'Point de vente', ShoppingCart], ['orders', 'Commandes', Truck], ['customers', 'Clients', Users], ['suppliers', 'Fournisseurs', Factory], ['finance', 'Finance', WalletCards], ['reports', 'Rapports', BarChart3], ['settings', 'Réglages', Settings]]
 const loadList = (key, initial = []) => ref(JSON.parse(localStorage.getItem(key) || JSON.stringify(initial)))
 const customerList = loadList('alpha-customers', [])
@@ -106,16 +106,38 @@ async function submitOrder() {
       localStorage.setItem('ozon-customer-id', o.customerId)
       localStorage.setItem('ozon-api-key', o.apiKey)
       try {
-        const response = await createOzonParcel({ customerId: o.customerId, apiKey: o.apiKey, parcel: { 'parcel-receiver': c.name, 'parcel-phone': c.phone, 'parcel-city': c.cityId, 'parcel-address': c.address, 'parcel-note': c.note, 'parcel-price': sale.total, 'parcel-declared-value': o.declaredValue, 'parcel-nature': 'Commande ' + sale.number, 'parcel-stock': 1, 'parcel-open': o.open, 'parcel-fragile': o.fragile, 'parcel-replace': o.replace, products: JSON.stringify(sale.items.map(i => ({ ref: i.sku || i.productId, qnty: i.quantity }))) } })
-        const tracking = response['TRACKING-NUMBER']
-        await shop.attachShipment(sale.id, { tracking, city: response.CITY_NAME, status: response.STATUS || 'created', response })
-        shop.notify(`Colis créé : ${tracking || 'Ozon Express'}`)
-      } catch (error) { shop.notify(`Vente créée — colis Ozon à renvoyer : ${error.message}`) }
+        const cityParam = c.city || c.cityId || 'Casablanca'
+        const response = await createOzonParcel({
+          customerId: o.customerId,
+          apiKey: o.apiKey,
+          parcel: {
+            'parcel-receiver': c.name,
+            'parcel-phone': c.phone,
+            'parcel-city': cityParam,
+            'parcel-address': c.address,
+            'parcel-note': c.note || 'Commande POS',
+            'parcel-price': sale.total,
+            'parcel-declared-value': o.declaredValue || sale.total,
+            'parcel-nature': 'Commande ' + sale.number,
+            'parcel-stock': 0,
+            'parcel-open': o.open || '1',
+            'parcel-fragile': o.fragile || '0',
+            'parcel-replace': o.replace || '0',
+            products: JSON.stringify(sale.items.map(i => ({ ref: i.sku || i.productId, qnty: i.quantity })))
+          }
+        })
+        const tracking = response['TRACKING-NUMBER'] || response.tracking || 'Ozon Express'
+        await shop.attachShipment(sale.id, { tracking, city: response.CITY_NAME || cityParam, status: 'created', response })
+        shop.notify(`Colis créé Ozon Express : ${tracking}`)
+      } catch (error) {
+        console.error('Ozon creation error:', error)
+        shop.notify(`Vente créée — Erreur Ozon : ${error.message}`)
+      }
     }
     if (sale) {
       checkoutModal.value = false
-      // Bug fix: reset order form after successful checkout
-      order.value = { discount: 0, shipping: 0, customer: { name: '', phone: '', cityId: '', city: '', address: '', note: '' }, sendOzon: false, ozon: order.value.ozon }
+      // Reset order form after successful checkout
+      order.value = { discount: 0, shipping: 0, customer: { name: '', phone: '', cityId: '', city: '', address: '', note: '' }, sendOzon: true, ozon: order.value.ozon }
     }
   } finally {
     submitting.value = false
