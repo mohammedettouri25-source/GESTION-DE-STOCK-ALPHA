@@ -396,12 +396,16 @@ async function submitOrder() {
       localStorage.setItem('ozon-api-key', o.apiKey)
       try {
         let cityIdParam = String(c.cityId || '').trim()
-        if (!cityIdParam && c.city) {
-          const query = c.city.trim().toLowerCase()
+        const query = String(c.city || '').trim().toLowerCase()
+
+        // Match against official Ozon cities database
+        if (query) {
           const match = OZON_CITIES.find(city => city.name.toLowerCase() === query || city.name.toLowerCase().includes(query))
           if (match) cityIdParam = String(match.id)
         }
-        if (!cityIdParam) cityIdParam = '2165'
+        if (!cityIdParam || cityIdParam === '1' || cityIdParam === '0') {
+          cityIdParam = '2165' // Default Casablanca ID (2165)
+        }
 
         const validId = (o.customerId && /^\d+$/.test(String(o.customerId).trim())) ? String(o.customerId).trim() : (import.meta.env.VITE_OZON_CUSTOMER_ID || '89381')
         const validKey = (o.apiKey && String(o.apiKey).trim().length > 5) ? String(o.apiKey).trim() : (import.meta.env.VITE_OZON_API_KEY || 'db4545-4ede23-78ef27-868f4a-fa5359')
