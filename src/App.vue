@@ -72,6 +72,9 @@ function formatWhatsAppPhone(phone) {
 
 function downloadInvoicePdf(sale) {
   if (!sale) return
+  const win = window.open('', '_blank')
+  if (!win) return shop.notify('Autorisez les fenêtres surgissantes pour l\'impression')
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -79,7 +82,7 @@ function downloadInvoicePdf(sale) {
       <meta charset="utf-8">
       <title>Facture_${sale.number}</title>
       <style>
-        body { font-family: Arial, sans-serif; padding: 30px; color: #111; max-width: 680px; margin: 0 auto; }
+        body { font-family: Arial, sans-serif; padding: 28px; color: #111; max-width: 680px; margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 16px; margin-bottom: 20px; }
         .logo { font-size: 24px; font-weight: 900; letter-spacing: -1px; }
         .logo span { background: #111; color: #fff; padding: 2px 8px; border-radius: 4px; margin-right: 6px; }
@@ -144,17 +147,13 @@ function downloadInvoicePdf(sale) {
         <p style="margin:0 0 4px; font-weight:bold;">Merci pour votre confiance !</p>
         <p style="margin:0; font-size:11px;">Alpha Shop07 — Document officiel généré automatiquement</p>
       </div>
-      <' + 'script>
-        window.onload = function() {
-          window.print();
-        }
-      </' + 'script>
     </body>
     </html>
   `
-  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  window.open(url, '_blank')
+  win.document.open()
+  win.document.write(htmlContent)
+  win.document.close()
+  setTimeout(() => win.print(), 250)
 }
 
 function sendWhatsAppOrderMessage(sale) {
@@ -162,17 +161,14 @@ function sendWhatsAppOrderMessage(sale) {
   const phone = formatWhatsAppPhone(c.phone)
   if (!phone) return shop.notify('Numéro de téléphone client non spécifié')
 
-  // Generate and open PDF print document
-  downloadInvoicePdf(sale)
-
   const total = money(sale.total)
   const trackingText = sale.shipment?.tracking ? `\n📦 *N° Suivi Ozon Express :* ${sale.shipment.tracking}` : ''
   const itemsText = (sale.items || []).map(i => `- ${i.name} (x${i.quantity})`).join('\n')
 
-  const message = `Bonjour ${c.name || 'Cher client'},\n\nVoici votre document de facture officielle *${sale.number}* chez *${settings.value.business || 'Alpha Shop07'}* (document ci-joint) :\n\n📋 *Articles :*\n${itemsText}\n\n💰 *Total Net :* ${total}${trackingText}\n\nMerci pour votre confiance ! 🙏`
+  const message = `Bonjour ${c.name || 'Cher client'},\n\nVoici le document de votre facture officielle *${sale.number}* chez *${settings.value.business || 'Alpha Shop07'}* :\n\n📋 *Articles :*\n${itemsText}\n\n💰 *Total Net :* ${total}${trackingText}\n\nMerci pour votre confiance ! 🙏`
 
   const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`
-  setTimeout(() => window.open(url, '_blank'), 400)
+  window.open(url, '_blank')
 }
 
 function sendWhatsAppCustomerMessage(customer) {
@@ -1043,10 +1039,10 @@ onMounted(async () => {
           <h3 style="margin:0; font-size:16px;">DOCUMENT DE FACTURE</h3>
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
             <button v-if="activeInvoice.customer?.phone" type="button" class="primary" style="background:#16a34a; border:none; display:flex; gap:6px; align-items:center;" @click="sendWhatsAppOrderMessage(activeInvoice)">
-              <MessageCircle :size="16"/> Envoyer sur WhatsApp 💬
+              <MessageCircle :size="16"/> WhatsApp Direct 💬
             </button>
-            <button type="button" class="primary" @click="triggerPrint" style="display:flex; gap:6px; align-items:center;">
-              <Printer :size="16"/> Imprimer la Facture 🖨️
+            <button type="button" class="primary" style="background:#4f46e5; border:none; display:flex; gap:6px; align-items:center;" @click="downloadInvoicePdf(activeInvoice)">
+              <Printer :size="16"/> Télécharger PDF / Imprimer 🖨️
             </button>
             <button type="button" class="quiet icon" @click="invoiceModal=false"><X :size="16"/></button>
           </div>
