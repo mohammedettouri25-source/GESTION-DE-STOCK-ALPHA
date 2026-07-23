@@ -5,17 +5,44 @@ import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCa
 import { createOzonParcel, getOzonParcelInfo } from './services/ozon'
 import { OZON_CITIES } from './services/ozonCities'
 
-function onCitySelect() {
-  const match = OZON_CITIES.find(c => String(c.id) === String(order.value.customer.cityId))
-  if (match) {
-    order.value.customer.city = match.name
-  }
+const citySearchOpen = ref(false)
+
+const popularCities = [
+  { id: 2165, name: 'Casablanca' },
+  { id: 2282, name: 'Rabat' },
+  { id: 199, name: 'Marrakech' },
+  { id: 127, name: 'Fes' },
+  { id: 37, name: 'Agadir' },
+  { id: 2368, name: 'Tanger' },
+  { id: 2140, name: 'Meknes' },
+  { id: 2216, name: 'Oujda' },
+  { id: 2320, name: 'Safi' },
+  { id: 109, name: 'El Jadida' }
+]
+
+const citySuggestions = computed(() => {
+  const query = (order.value?.customer?.city || '').trim().toLowerCase()
+  if (!query) return popularCities
+  return OZON_CITIES.filter(c =>
+    c.name.toLowerCase().includes(query) ||
+    (c.ref && c.ref.toLowerCase().includes(query))
+  ).slice(0, 10)
+})
+
+function selectCity(city) {
+  order.value.customer.city = city.name
+  order.value.customer.cityId = city.id
+  citySearchOpen.value = false
 }
 
 function onCityInput() {
+  citySearchOpen.value = true
   const query = (order.value.customer.city || '').trim().toLowerCase()
-  if (!query) return
-  const match = OZON_CITIES.find(c => c.name.toLowerCase() === query || c.name.toLowerCase().includes(query))
+  if (!query) {
+    order.value.customer.cityId = ''
+    return
+  }
+  const match = OZON_CITIES.find(c => c.name.toLowerCase() === query)
   if (match) {
     order.value.customer.cityId = match.id
   }
@@ -959,30 +986,35 @@ onMounted(async () => {
           <label>Téléphone<input v-model="order.customer.phone" placeholder="0612345678" :required="order.sendOzon"/></label>
         </div>
         <div class="two">
-          <label>Saisir la Ville (Recherche Texte / Auto-complétion)
-            <input
-              v-model="order.customer.city"
-              list="ozon-cities-list"
-              placeholder="Tapez pour chercher (Ex: Casablanca, Rabat...)"
-              @input="onCityInput"
-              :required="order.sendOzon"
-            />
-            <datalist id="ozon-cities-list">
-              <option v-for="c in OZON_CITIES" :key="c.id" :value="c.name">
-                {{ c.name }} (ID: {{ c.id }})
-              </option>
-            </datalist>
-          </label>
-          <label>Ville Ozon Express (Liste Déroulante / Select)
-            <select v-model="order.customer.cityId" @change="onCitySelect" :required="order.sendOzon">
-              <option value="">-- Sélectionner dans la liste --</option>
-              <option v-for="c in OZON_CITIES" :key="c.id" :value="c.id">
-                {{ c.name }} (ID: {{ c.id }})
-              </option>
-            </select>
-          </label>
+          <div class="city-picker-container">
+            <label>Ville de livraison (Ozon Express)
+              <input
+                v-model="order.customer.city"
+                placeholder="Tapez votre ville (Ex: Casablanca, Rabat...)"
+                @input="onCityInput"
+                @focus="citySearchOpen = true"
+                @blur="setTimeout(() => { citySearchOpen = false }, 250)"
+                :required="order.sendOzon"
+                autocomplete="off"
+              />
+            </label>
+            <div
+              v-if="citySearchOpen && citySuggestions.length"
+              class="city-dropdown"
+            >
+              <div
+                v-for="c in citySuggestions"
+                :key="c.id"
+                class="city-option"
+                @mousedown.prevent="selectCity(c)"
+              >
+                <span><b>{{ c.name }}</b></span>
+                <span class="city-badge">ID: {{ c.id }}</span>
+              </div>
+            </div>
+          </div>
+          <label>Adresse complète<input v-model="order.customer.address" placeholder="123 Rue Hassan II, Quartier Maarif" :required="order.sendOzon"/></label>
         </div>
-        <label>Adresse complète<input v-model="order.customer.address" placeholder="123 Rue Hassan II, Quartier Maarif" :required="order.sendOzon"/></label>
         <label>Note de livraison<input v-model="order.customer.note" placeholder="Appeler avant livraison"/></label>
         <div v-if="order.sendOzon" class="ozon-settings">
           <p class="eyebrow">OZON EXPRESS</p>

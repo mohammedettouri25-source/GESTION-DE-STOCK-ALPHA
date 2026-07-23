@@ -26,13 +26,36 @@ export const useShop = defineStore('shop', {
   }),
 
   getters: {
-    inventoryValue: s => s.products.reduce((sum, p) => sum + p.variants.reduce((x, v) => x + v.stock * p.purchasePrice, 0), 0),
-    lowStock: s => s.products.flatMap(p => p.variants.filter(v => v.stock <= v.min).map(v => ({ ...v, product: p.name }))),
+    inventoryValue: s => s.products.reduce((sum, p) => sum + p.variants.reduce((x, v) => x + v.stock * (p.purchasePrice || 0), 0), 0),
+    lowStock: s => s.products.flatMap(p => p.variants.filter(v => v.stock <= v.min).map(v => ({ ...v, product: p.name, productId: p.id, purchasePrice: p.purchasePrice || 0 }))),
     todaySales: s => s.sales.filter(x => new Date(x.createdAt).toDateString() === new Date().toDateString()).reduce((n, x) => n + x.total, 0),
     monthSales: s => s.sales.filter(x => new Date(x.createdAt).getMonth() === new Date().getMonth()).reduce((n, x) => n + x.total, 0),
     totalExpenses: s => s.expenses.reduce((sum, x) => sum + Number(x.amount || 0), 0),
     totalSales: s => s.sales.reduce((sum, x) => sum + Number(x.total || 0), 0),
-    netProfit: s => s.sales.reduce((sum, x) => sum + Number(x.total || 0), 0) - s.expenses.reduce((sum, x) => sum + Number(x.amount || 0), 0),
+    totalCOGS: s => s.sales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, i) => {
+      const p = s.products.find(prod => prod.id === i.productId || prod.sku === i.sku)
+      const cost = i.purchasePrice || p?.purchasePrice || 0
+      return itemSum + cost * i.quantity
+    }, 0), 0),
+    grossProfit: s => s.totalSales - s.sales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, i) => {
+      const p = s.products.find(prod => prod.id === i.productId || prod.sku === i.sku)
+      const cost = i.purchasePrice || p?.purchasePrice || 0
+      return itemSum + cost * i.quantity
+    }, 0), 0),
+    netProfit: s => (s.totalSales - s.sales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, i) => {
+      const p = s.products.find(prod => prod.id === i.productId || prod.sku === i.sku)
+      const cost = i.purchasePrice || p?.purchasePrice || 0
+      return itemSum + cost * i.quantity
+    }, 0), 0)) - s.expenses.reduce((sum, x) => sum + Number(x.amount || 0), 0),
+    profitMargin: s => {
+      const gross = s.totalSales - s.sales.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, i) => {
+        const p = s.products.find(prod => prod.id === i.productId || prod.sku === i.sku)
+        const cost = i.purchasePrice || p?.purchasePrice || 0
+        return itemSum + cost * i.quantity
+      }, 0), 0)
+      const net = gross - s.expenses.reduce((sum, x) => sum + Number(x.amount || 0), 0)
+      return s.totalSales ? ((net / s.totalSales) * 100).toFixed(1) : 0
+    },
     cartTotal: s => s.cart.reduce((n, x) => n + x.price * x.quantity, 0)
   },
 
@@ -54,6 +77,9 @@ export const useShop = defineStore('shop', {
       if (!this.products.length) {
         await localDb.products.bulkAdd(seed)
         this.products = [...seed]
+        for (const p of seed) {
+          await this.queue('products', p)
+        }
       }
 
       if (navigator.onLine) {
@@ -219,6 +245,7 @@ export const useShop = defineStore('shop', {
           this.products.splice(pIdx, 1, updatedProduct)
 
           await localDb.products.put(updatedProduct)
+          await this.queue('products', updatedProduct)
           await localDb.movements.add({
             id: crypto.randomUUID(),
             productId: p.id,
@@ -415,6 +442,36 @@ export const useShop = defineStore('shop', {
               const idx = this.sales.findIndex(x => x.id === payload.id)
               if (idx < 0) this.sales.unshift(payload)
               else this.sales.splice(idx, 1, payload)
+            } else if (entity_type === 'customers') {
+              if (payload.deleted) {
+                localDb.customers.delete(entity_id)
+                this.customers = this.customers.filter(x => x.id !== entity_id)
+              } else if (payload.id) {
+                localDb.customers.put(payload)
+                const idx = this.customers.findIndex(x => x.id === payload.id)
+                if (idx < 0) this.customers.unshift(payload)
+                else this.customers.splice(idx, 1, payload)
+              }
+            } else if (entity_type === 'suppliers') {
+              if (payload.deleted) {
+                localDb.suppliers?.delete(entity_id).catch(() => {})
+                this.suppliers = this.suppliers.filter(x => x.id !== entity_id)
+              } else if (payload.id) {
+                localDb.suppliers?.put(payload).catch(() => {})
+                const idx = this.suppliers.findIndex(x => x.id === payload.id)
+                if (idx < 0) this.suppliers.unshift(payload)
+                else this.suppliers.splice(idx, 1, payload)
+              }
+            } else if (entity_type === 'expenses') {
+              if (payload.deleted) {
+                localDb.expenses?.delete(entity_id).catch(() => {})
+                this.expenses = this.expenses.filter(x => x.id !== entity_id)
+              } else if (payload.id) {
+                localDb.expenses?.put(payload).catch(() => {})
+                const idx = this.expenses.findIndex(x => x.id === payload.id)
+                if (idx < 0) this.expenses.unshift(payload)
+                else this.expenses.splice(idx, 1, payload)
+              }
             }
           })
           .subscribe()
