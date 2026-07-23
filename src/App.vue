@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useShop } from './stores/shop'
-import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText, Bot, Sparkles } from 'lucide-vue-next'
+import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText, Bot, Sparkles, Lock, LogOut, KeyRound, Eye, EyeOff } from 'lucide-vue-next'
 import { createOzonParcel, getOzonParcelInfo } from './services/ozon'
 import { OZON_CITIES } from './services/ozonCities'
 
@@ -25,6 +25,30 @@ const activeInvoice = ref(null)
 const aiModal = ref(false)
 const aiPrompt = ref('')
 const aiAnalyzing = ref(false)
+
+const authenticated = ref(localStorage.getItem('alpha-auth') === 'true')
+const loginPassword = ref('')
+const loginError = ref('')
+const showPass = ref(false)
+const masterPin = ref(localStorage.getItem('alpha-pin') || '1234')
+
+function handleLogin() {
+  if (loginPassword.value.trim() === masterPin.value) {
+    authenticated.value = true
+    localStorage.setItem('alpha-auth', 'true')
+    loginError.value = ''
+    loginPassword.value = ''
+    shop.notify('Connexion réussie ! Bienvenue sur Alpha Shop07')
+  } else {
+    loginError.value = 'Code PIN / Mot de passe incorrect !'
+  }
+}
+
+function handleLogout() {
+  authenticated.value = false
+  localStorage.removeItem('alpha-auth')
+  shop.notify('Déconnexion réussie')
+}
 
 function showInvoice(sale) {
   activeInvoice.value = sale
@@ -163,7 +187,7 @@ const supplierList = loadList('alpha-suppliers', [])
 const expenseList = loadList('alpha-expenses', [])
 const entryModal = ref('')
 const entry = ref({})
-const settings = ref({ business: localStorage.getItem('alpha-business') || 'Alpha Shop', currency: 'MAD', ozonId: localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '', ozonKey: localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || '' })
+const settings = ref({ business: localStorage.getItem('alpha-business') || 'Alpha Shop', currency: 'MAD', ozonId: localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '', ozonKey: localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || '', pin: localStorage.getItem('alpha-pin') || '1234' })
 const labels = { fr: { title: `Aujourd'hui`, sales: 'Ventes du jour', month: 'Ventes du mois', stock: 'Stock à surveiller', profit: 'Bénéfice estimé' }, ar: { title: 'اليوم', sales: 'مبيعات اليوم', month: 'مبيعات الشهر', stock: 'مخزون منخفض', profit: 'الربح المقدر' } }
 const t = computed(() => labels[shop.language])
 const filtered = computed(() => shop.products.filter(p => `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(shop.query.toLowerCase())))
@@ -214,7 +238,16 @@ async function deleteEntry(type, id) {
     else if (type === 'expense') await shop.removeExpense(id)
   }
 }
-function saveSettings() { localStorage.setItem('alpha-business', settings.value.business); localStorage.setItem('ozon-customer-id', settings.value.ozonId); localStorage.setItem('ozon-api-key', settings.value.ozonKey); shop.notify('Réglages enregistrés') }
+function saveSettings() {
+  localStorage.setItem('alpha-business', settings.value.business)
+  localStorage.setItem('ozon-customer-id', settings.value.ozonId)
+  localStorage.setItem('ozon-api-key', settings.value.ozonKey)
+  if (settings.value.pin) {
+    localStorage.setItem('alpha-pin', settings.value.pin)
+    masterPin.value = settings.value.pin
+  }
+  shop.notify('Réglages et Code PIN enregistrés')
+}
 function exportSales() { const rows = ['Numéro;Date;Total;Paiement;Client', ...shop.sales.map(s => `${s.number};${new Date(s.createdAt).toLocaleDateString('fr-MA')};${s.total};${s.payment};${s.customer?.name||'Comptoir'}`)]; const url = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement('a'); a.href = url; a.download = `rapport-ventes-${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url) }
 function openCheckout() { if (!shop.cart.length) return shop.notify('Ajoutez au moins un article au panier'); mobileCartSheet.value = false; checkoutModal.value = true }
 const orderTotal = computed(() => Math.max(0, shop.cartTotal - (Number(order.value.discount) || 0) + (Number(order.value.shipping) || 0)))
@@ -275,7 +308,50 @@ onMounted(() => shop.init())
 </script>
 
 <template>
-  <div class="shell" :class="{arabic:shop.language==='ar'}">
+  <!-- Modern Login Screen Overlay -->
+  <div v-if="!authenticated" class="login-screen-bg">
+    <div class="login-card">
+      <div class="login-brand">
+        <span class="mark">A</span>
+        <span>ALPHASHOP<sup>07</sup></span>
+      </div>
+      <p class="login-subtitle">Gestion de Stock & Point de Vente Sécurisé</p>
+
+      <form class="login-form" @submit.prevent="handleLogin">
+        <div class="input-field">
+          <label>Code PIN / Mot de passe</label>
+          <div class="input-wrapper">
+            <KeyRound :size="18" class="input-icon"/>
+            <input
+              v-model="loginPassword"
+              :type="showPass ? 'text' : 'password'"
+              placeholder="Entrez votre PIN (Ex: 1234)"
+              required
+              autofocus
+            />
+            <button type="button" class="toggle-pass" @click="showPass = !showPass">
+              <Eye v-if="!showPass" :size="18"/>
+              <EyeOff v-else :size="18"/>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="loginError" class="login-error">
+          <AlertTriangle :size="16"/> {{ loginError }}
+        </div>
+
+        <button type="submit" class="login-btn">
+          <Lock :size="18"/> Se Connecter à Alpha Shop 🔒
+        </button>
+      </form>
+
+      <div class="login-footer">
+        <small>Code PIN par défaut : <b>1234</b> (Modifiable dans Réglages)</small>
+      </div>
+    </div>
+  </div>
+
+  <div v-else class="shell" :class="{arabic:shop.language==='ar'}">
     <!-- Mobile Sidebar Drawer Backdrop -->
     <div v-if="mobile" class="sidebar-backdrop" @click="mobile = false"></div>
 
@@ -302,10 +378,10 @@ onMounted(() => shop.init())
           <WifiOff v-else :size="15"/>
           {{shop.online?'Synchronisé':'Mode hors ligne'}}
         </div>
-        <div class="avatar">
+        <div class="avatar" @click="handleLogout" style="cursor:pointer;" title="Se déconnecter">
           <b>MA</b>
-          <span>Mohamed A.<small>Propriétaire</small></span>
-          <MoreHorizontal :size="17"/>
+          <span>Mohamed A.<small>Déconnexion 🚪</small></span>
+          <LogOut :size="16"/>
         </div>
       </div>
     </aside>
@@ -324,8 +400,8 @@ onMounted(() => shop.init())
           <button class="lang" @click="shop.setLanguage(shop.language==='fr'?'ar':'fr')">
             {{shop.language==='fr'?'ع':'FR'}}
           </button>
-          <button class="icon"><Bell :size="19"/></button>
           <button class="icon" @click="shop.active='settings'"><Settings :size="19"/></button>
+          <button class="icon" style="color:#dc2626;" title="Se déconnecter" @click="handleLogout"><LogOut :size="19"/></button>
         </div>
       </header>
 
@@ -591,6 +667,12 @@ onMounted(() => shop.init())
             <h2>Ozon Express</h2>
             <label>ID Client<input v-model="settings.ozonId"/></label>
             <label>Clé API<input v-model="settings.ozonKey" type="password"/></label>
+          </div>
+          <div>
+            <h2>Sécurité & Accès</h2>
+            <label>Code PIN / Mot de passe du Dashboard (Par défaut : 1234)
+              <input v-model="settings.pin" type="text" placeholder="Ex: 1234"/>
+            </label>
           </div>
           <div class="modal-actions">
             <button class="primary">Enregistrer les réglages</button>
