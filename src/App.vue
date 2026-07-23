@@ -70,20 +70,109 @@ function formatWhatsAppPhone(phone) {
   return cleaned
 }
 
+function downloadInvoicePdf(sale) {
+  if (!sale) return
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Facture_${sale.number}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 30px; color: #111; max-width: 680px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 16px; margin-bottom: 20px; }
+        .logo { font-size: 24px; font-weight: 900; letter-spacing: -1px; }
+        .logo span { background: #111; color: #fff; padding: 2px 8px; border-radius: 4px; margin-right: 6px; }
+        .info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; background: #f9f9f8; padding: 14px; border-radius: 8px; border: 1px solid #eee; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px; }
+        th { background: #111; color: #fff; padding: 10px; text-align: left; }
+        td { padding: 10px; border-bottom: 1px solid #eee; }
+        .totals { width: 260px; margin-left: auto; margin-bottom: 24px; font-size: 13px; }
+        .totals-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #ddd; }
+        .grand { font-size: 16px; font-weight: 800; border-top: 2px solid #111; border-bottom: none; padding-top: 10px; margin-top: 4px; }
+        .footer { text-align: center; font-size: 12px; color: #777; border-top: 1px solid #eee; padding-top: 16px; margin-top: 30px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div>
+          <div class="logo"><span>A</span> ALPHA SHOP<sup>07</sup></div>
+          <p style="margin:4px 0 0; font-size:12px; color:#555;">Gestion de Stock & Point de Vente</p>
+        </div>
+        <div style="text-align:right;">
+          <h2 style="margin:0; font-size:18px;">FACTURE DE VENTE</h2>
+          <b>N° ${sale.number}</b><br/>
+          <small>Date: ${new Date(sale.createdAt).toLocaleString('fr-MA')}</small>
+        </div>
+      </div>
+      <div class="info">
+        <div>
+          <h4 style="margin:0 0 6px; font-size:11px; text-transform:uppercase; color:#666;">Émetteur</h4>
+          <b>${settings.value.business || 'Alpha Shop07'}</b>
+        </div>
+        <div>
+          <h4 style="margin:0 0 6px; font-size:11px; text-transform:uppercase; color:#666;">Client & Destination</h4>
+          <b>${sale.customer?.name || 'Vente Comptoir'}</b><br/>
+          ${sale.customer?.phone ? 'Tél: ' + sale.customer.phone + '<br/>' : ''}
+          ${sale.customer?.city ? 'Ville: ' + sale.customer.city + '<br/>' : ''}
+          ${sale.customer?.address ? 'Adresse: ' + sale.customer.address + '<br/>' : ''}
+          ${sale.shipment?.tracking ? '<b style="color:#2563eb;">Suivi Ozon: ' + sale.shipment.tracking + '</b>' : ''}
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Article</th><th style="text-align:center;">Qté</th><th style="text-align:right;">Prix Unitaire</th><th style="text-align:right;">Total</th></tr>
+        </thead>
+        <tbody>
+          ${(sale.items || []).map(i => `
+            <tr>
+              <td><b>${i.name}</b> ${i.variant ? '(' + i.variant + ')' : ''}</td>
+              <td style="text-align:center;">${i.quantity}</td>
+              <td style="text-align:right;">${money(i.price)}</td>
+              <td style="text-align:right;"><b>${money(i.price * i.quantity)}</b></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <div class="totals">
+        <div class="totals-row"><span>Sous-total:</span><b>${money(sale.subtotal || sale.total)}</b></div>
+        ${sale.discount ? `<div class="totals-row"><span>Réduction:</span><b style="color:#dc2626;">-${money(sale.discount)}</b></div>` : ''}
+        ${sale.shipping ? `<div class="totals-row"><span>Livraison:</span><b>+${money(sale.shipping)}</b></div>` : ''}
+        <div class="totals-row grand"><span>TOTAL NET (MAD):</span><span>${money(sale.total)}</span></div>
+      </div>
+      <div class="footer">
+        <p style="margin:0 0 4px; font-weight:bold;">Merci pour votre confiance !</p>
+        <p style="margin:0; font-size:11px;">Alpha Shop07 — Document officiel généré automatiquement</p>
+      </div>
+      <' + 'script>
+        window.onload = function() {
+          window.print();
+        }
+      </' + 'script>
+    </body>
+    </html>
+  `
+  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  window.open(url, '_blank')
+}
+
 function sendWhatsAppOrderMessage(sale) {
   const c = sale?.customer || {}
   const phone = formatWhatsAppPhone(c.phone)
   if (!phone) return shop.notify('Numéro de téléphone client non spécifié')
 
+  // Generate and open PDF print document
+  downloadInvoicePdf(sale)
+
   const total = money(sale.total)
   const trackingText = sale.shipment?.tracking ? `\n📦 *N° Suivi Ozon Express :* ${sale.shipment.tracking}` : ''
   const itemsText = (sale.items || []).map(i => `- ${i.name} (x${i.quantity})`).join('\n')
-  const invoiceLink = `${window.location.origin}/?invoice=${encodeURIComponent(sale.number)}`
 
-  const message = `Bonjour ${c.name || 'Cher client'},\n\nVoici votre document de facture officielle *${sale.number}* chez *${settings.value.business || 'Alpha Shop07'}* :\n\n📄 *Voir/Télécharger votre Facture :*\n${invoiceLink}\n\n📋 *RésuméCommande :*\n${itemsText}\n\n💰 *Total Net :* ${total}${trackingText}\n\nMerci pour votre confiance ! 🙏`
+  const message = `Bonjour ${c.name || 'Cher client'},\n\nVoici votre document de facture officielle *${sale.number}* chez *${settings.value.business || 'Alpha Shop07'}* (document ci-joint) :\n\n📋 *Articles :*\n${itemsText}\n\n💰 *Total Net :* ${total}${trackingText}\n\nMerci pour votre confiance ! 🙏`
 
   const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`
-  window.open(url, '_blank')
+  setTimeout(() => window.open(url, '_blank'), 400)
 }
 
 function sendWhatsAppCustomerMessage(customer) {
