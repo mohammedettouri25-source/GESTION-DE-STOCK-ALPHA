@@ -385,7 +385,9 @@ const orderTotal = computed(() => Math.max(0, shop.cartTotal - (Number(order.val
 // Bug fix: submitOrder now uses finally to always unblock the button, and resets order after success
 async function submitOrder() {
   const c = order.value.customer, o = order.value.ozon
-  if (order.value.sendOzon && (!c.name || !c.phone || !c.cityId || !c.address)) return shop.notify('Complétez le client et son adresse')
+  if (order.value.sendOzon && (!c.name || !c.phone || (!c.cityId && !c.city) || !c.address)) {
+    return shop.notify('Veuillez renseigner le nom, téléphone, ville et adresse du client')
+  }
   submitting.value = true
   try {
     const sale = await shop.checkout(payment.value, { discount: order.value.discount, shipping: order.value.shipping, customer: c })
@@ -393,9 +395,17 @@ async function submitOrder() {
       localStorage.setItem('ozon-customer-id', o.customerId)
       localStorage.setItem('ozon-api-key', o.apiKey)
       try {
-        const cityIdParam = String(c.cityId || '2165')
-        const validId = (o.customerId && /^\d+$/.test(o.customerId.trim())) ? o.customerId.trim() : (import.meta.env.VITE_OZON_CUSTOMER_ID || '89381')
-        const validKey = (o.apiKey && o.apiKey.length > 5 && !o.apiKey.includes(' ')) ? o.apiKey.trim() : (import.meta.env.VITE_OZON_API_KEY || 'db4545-4ede23-78ef27-868f4a-fa5359')
+        let cityIdParam = String(c.cityId || '').trim()
+        if (!cityIdParam && c.city) {
+          const query = c.city.trim().toLowerCase()
+          const match = OZON_CITIES.find(city => city.name.toLowerCase() === query || city.name.toLowerCase().includes(query))
+          if (match) cityIdParam = String(match.id)
+        }
+        if (!cityIdParam) cityIdParam = '2165'
+
+        const validId = (o.customerId && /^\d+$/.test(String(o.customerId).trim())) ? String(o.customerId).trim() : (import.meta.env.VITE_OZON_CUSTOMER_ID || '89381')
+        const validKey = (o.apiKey && String(o.apiKey).trim().length > 5) ? String(o.apiKey).trim() : (import.meta.env.VITE_OZON_API_KEY || 'db4545-4ede23-78ef27-868f4a-fa5359')
+
         const response = await createOzonParcel({
           customerId: validId,
           apiKey: validKey,
@@ -416,10 +426,10 @@ async function submitOrder() {
         })
         const tracking = response['TRACKING-NUMBER'] || response.tracking || response['NEW-PARCEL']?.['TRACKING-NUMBER'] || 'Ozon Express'
         await shop.attachShipment(sale.id, { tracking, city: response.CITY_NAME || c.city || 'Casablanca', status: 'created', response })
-        shop.notify(`Colis créé Ozon Express : ${tracking}`)
+        shop.notify(`Colis créé Ozon Express avec succès ! Tracking : ${tracking}`)
       } catch (error) {
         console.error('Ozon creation error:', error)
-        shop.notify(`Vente créée — Erreur Ozon : ${error.message}`)
+        shop.notify(`Vente enregistrée — Attention Ozon : ${error.message}`)
       }
     }
     if (sale) {
