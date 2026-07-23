@@ -47,7 +47,14 @@ const filtered = computed(() => shop.products.filter(p => `${p.name} ${p.sku} ${
 // Bug fix: reset query when switching views so search doesn't bleed across sections
 function navigate(id) { shop.query = ''; shop.active = id; mobile.value = false }
 
-function edit(p) { draft.value = p ? structuredClone(p) : blank(); productModal.value = true }
+function edit(p) {
+  try {
+    draft.value = p ? JSON.parse(JSON.stringify(p)) : blank()
+  } catch (_) {
+    draft.value = blank()
+  }
+  productModal.value = true
+}
 async function save() { if (!draft.value.name) return shop.notify('Le nom du produit est requis'); await shop.saveProduct(draft.value); productModal.value = false }
 function selectVariant(p) { if (p.variants.length === 1) shop.addCart(p, p.variants[0]); else variantModal.value = p }
 function money(n) { return new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD', maximumFractionDigits: 0 }).format(n) }
