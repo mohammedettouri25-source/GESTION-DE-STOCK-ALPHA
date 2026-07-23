@@ -512,8 +512,8 @@ onMounted(() => shop.init())
           <button class="primary" @click="addEntry(shop.active==='customers'?'customer':'supplier')"><Plus :size="17"/> Ajouter {{shop.active==='customers'?'un client':'un fournisseur'}}</button>
         </div>
         <div class="panel directory">
-          <div v-if="(shop.active==='customers'?shop.customers:shop.suppliers).length" class="table">
-            <div v-for="person in (shop.active==='customers'?shop.customers:shop.suppliers)" :key="person.id">
+          <div v-if="(shop.active==='customers' ? (shop.customers || []) : (shop.suppliers || [])).length" class="table">
+            <div v-for="person in (shop.active==='customers' ? (shop.customers || []) : (shop.suppliers || []))" :key="person.id || person.name">
               <span><b>{{person.name}}</b><small>{{person.phone||person.email||'Aucun contact'}}</small></span>
               <span>{{person.city||person.company||'—'}}</span>
               <strong>{{person.address||person.email||'—'}}</strong>
@@ -540,8 +540,8 @@ onMounted(() => shop.init())
           <div class="panel-title">
             <div><h2>Journal des Dépenses</h2><p>Loyer, salaires, électricité, publicité, livraison...</p></div>
           </div>
-          <div v-if="shop.expenses.length" class="table">
-            <div v-for="expense in shop.expenses" :key="expense.id">
+          <div v-if="(shop.expenses || []).length" class="table">
+            <div v-for="expense in (shop.expenses || [])" :key="expense.id || expense.category">
               <span><b>{{expense.category}}</b><small>{{expense.date}}</small></span>
               <span>{{expense.note||'—'}}</span>
               <strong style="color: #dc2626;">-{{money(expense.amount)}}</strong>

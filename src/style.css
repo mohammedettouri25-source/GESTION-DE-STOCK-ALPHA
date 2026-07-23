@@ -1221,6 +1221,10 @@ h2 {
     width: 100%;
   }
 
+  html, body, .shell {
+    overflow-x: hidden !important;
+  }
+
   .metrics {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
@@ -1235,11 +1239,11 @@ h2 {
   }
 
   .page {
-    padding: 18px 14px 90px;
+    padding: 14px 12px 100px !important;
   }
 
   .panel {
-    padding: 16px;
+    padding: 14px;
   }
 
   .chart {
@@ -1273,9 +1277,36 @@ h2 {
   }
 
   .modal {
-    padding: 18px;
-    width: 95vw;
+    padding: 16px !important;
+    width: 94vw !important;
+    max-height: 88vh !important;
     border-radius: 12px;
+    overflow-y: auto !important;
+  }
+
+  .table > div {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    background: #ffffff;
+    border: 1px solid #eaeaeb;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  }
+
+  .table > div:last-child {
+    margin-bottom: 0;
+  }
+
+  .directory .table > div {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
   }
 
   .toast {
