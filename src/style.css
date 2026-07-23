@@ -1287,17 +1287,120 @@ h2 {
 }
 
 /* Very Small Mobile (< 400px) */
-@media (max-width: 400px) {
-  .metrics {
-    grid-template-columns: 1fr;
+/* Printable Invoice Styles */
+.invoice-paper {
+  background: #fff;
+  color: #111;
+  padding: 28px;
+  border-radius: 12px;
+  max-width: 680px;
+  margin: 0 auto;
+  font-family: Arial, sans-serif;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+.invoice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 2px solid #111;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+}
+.invoice-logo {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -1px;
+}
+.invoice-logo span {
+  background: #111;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-right: 6px;
+}
+.invoice-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.invoice-box {
+  background: #f9f9f8;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #eaeaea;
+}
+.invoice-box h4 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #666;
+  letter-spacing: 0.5px;
+}
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.invoice-table th {
+  background: #111;
+  color: #fff;
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.invoice-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+}
+.invoice-totals {
+  width: 260px;
+  margin-left: auto;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+.invoice-totals-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px dashed #ddd;
+}
+.invoice-totals-row.grand {
+  font-size: 16px;
+  font-weight: 800;
+  border-top: 2px solid #111;
+  border-bottom: none;
+  padding-top: 8px;
+  margin-top: 4px;
+}
+.invoice-footer {
+  text-align: center;
+  font-size: 12px;
+  color: #777;
+  border-top: 1px solid #eee;
+  padding-top: 14px;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
   }
-  
-  .catalog {
-    grid-template-columns: 1fr;
+  .invoice-paper, .invoice-paper * {
+    visibility: visible;
   }
-  
-  .variant-fields {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto;
+  .invoice-paper {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 100%;
+    box-shadow: none;
+    padding: 20px;
+  }
+  .no-print {
+    display: none !important;
   }
 }
+

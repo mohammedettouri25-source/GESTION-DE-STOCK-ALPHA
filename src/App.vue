@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useShop } from './stores/shop'
-import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2 } from 'lucide-vue-next'
+import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText } from 'lucide-vue-next'
 import { createOzonParcel, getOzonParcelInfo } from './services/ozon'
 import { OZON_CITIES } from './services/ozonCities'
 
@@ -20,6 +20,17 @@ const variantModal = ref(null)
 const payment = ref('Espèces')
 const checkoutModal = ref(false)
 const submitting = ref(false)
+const invoiceModal = ref(false)
+const activeInvoice = ref(null)
+
+function showInvoice(sale) {
+  activeInvoice.value = sale
+  invoiceModal.value = true
+}
+
+function triggerPrint() {
+  window.print()
+}
 
 const blank = () => ({ name: '', sku: '', barcode: '', category: 'Général', brand: '', price: 0, purchasePrice: 0, variants: [{ color: 'Noir', size: 'Unique', stock: 0, min: 2, barcode: '' }] })
 const draft = ref(blank())
@@ -140,6 +151,7 @@ async function submitOrder() {
       checkoutModal.value = false
       // Reset order form after successful checkout
       order.value = { discount: 0, shipping: 0, customer: { name: '', phone: '', cityId: '', city: '', address: '', note: '' }, sendOzon: true, ozon: order.value.ozon }
+      showInvoice(sale)
     }
   } finally {
     submitting.value = false
@@ -363,8 +375,12 @@ onMounted(() => shop.init())
               <span><b>{{sale.number}}</b><small>{{new Date(sale.createdAt).toLocaleString('fr-MA')}}</small></span>
               <span><b>{{sale.customer?.name||'Vente comptoir'}}</b><small v-if="sale.shipment?.tracking">Ozon : {{sale.shipment.tracking}}</small></span>
               <strong>{{money(sale.total)}}</strong>
-              <button v-if="sale.shipment?.tracking" class="quiet" @click="verifyShipment(sale)">Vérifier Ozon</button>
-              <em v-else>Confirmée</em>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <button class="quiet" @click="showInvoice(sale)" title="Voir et imprimer la facture">
+                  <FileText :size="15"/> Facture
+                </button>
+                <button v-if="sale.shipment?.tracking" class="quiet" @click="verifyShipment(sale)">Vérifier Ozon</button>
+              </div>
             </div>
           </div>
           <div v-else class="empty">Aucune commande. Créez votre première vente depuis le point de vente.</div>
@@ -673,6 +689,98 @@ onMounted(() => shop.init())
           <button class="primary">Enregistrer</button>
         </div>
       </form>
+    </div>
+
+    <!-- Printable Invoice Modal (Alpha Shop) -->
+    <div v-if="invoiceModal && activeInvoice" class="overlay" @click.self="invoiceModal=false">
+      <div class="modal invoice-modal-container" style="max-width:720px; width:100%; padding: 20px; max-height:90vh; overflow-y:auto;">
+        <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3 style="margin:0; font-size:16px;">DOCUMENT DE FACTURE</h3>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="primary" @click="triggerPrint" style="display:flex; gap:6px; align-items:center;">
+              <Printer :size="16"/> Imprimer la Facture 🖨️
+            </button>
+            <button type="button" class="quiet icon" @click="invoiceModal=false"><X :size="16"/></button>
+          </div>
+        </div>
+
+        <!-- Printable Document Component -->
+        <div class="invoice-paper">
+          <div class="invoice-header">
+            <div>
+              <div class="invoice-logo"><span>A</span> ALPHA SHOP<sup>07</sup></div>
+              <p style="margin:4px 0 0; font-size:12px; color:#555;">Gestion de Stock & Point de Vente</p>
+            </div>
+            <div style="text-align:right;">
+              <h2 style="margin:0; font-size:18px; color:#111;">FACTURE DE VENTE</h2>
+              <b style="font-size:14px; color:#444;">N° {{activeInvoice.number}}</b>
+              <p style="margin:4px 0 0; font-size:12px; color:#777;">Date : {{new Date(activeInvoice.createdAt).toLocaleString('fr-MA')}}</p>
+            </div>
+          </div>
+
+          <div class="invoice-info-grid">
+            <div class="invoice-box">
+              <h4>Émetteur / Boutique</h4>
+              <b>{{settings.business || 'Alpha Shop'}}</b><br/>
+              <span>Vente Directe & Livraison</span>
+            </div>
+            <div class="invoice-box">
+              <h4>Client & Destination</h4>
+              <b>{{activeInvoice.customer?.name || 'Vente Comptoir'}}</b><br/>
+              <span v-if="activeInvoice.customer?.phone">Tél : {{activeInvoice.customer.phone}}<br/></span>
+              <span v-if="activeInvoice.customer?.city">Ville : {{activeInvoice.customer.city}}<br/></span>
+              <span v-if="activeInvoice.customer?.address">Adresse : {{activeInvoice.customer.address}}<br/></span>
+              <span v-if="activeInvoice.shipment?.tracking" style="font-weight:700; color:#2563eb;">Suivi Ozon : {{activeInvoice.shipment.tracking}}</span>
+            </div>
+          </div>
+
+          <table class="invoice-table">
+            <thead>
+              <tr>
+                <th>Article</th>
+                <th style="text-align:center;">Qté</th>
+                <th style="text-align:right;">Prix Unitaire</th>
+                <th style="text-align:right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in activeInvoice.items" :key="item.variantId || item.productId">
+                <td><b>{{item.name}}</b> <small v-if="item.variant">({{item.variant}})</small></td>
+                <td style="text-align:center;">{{item.quantity}}</td>
+                <td style="text-align:right;">{{money(item.price)}}</td>
+                <td style="text-align:right;"><b>{{money(item.price * item.quantity)}}</b></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="invoice-totals">
+            <div class="invoice-totals-row">
+              <span>Sous-total</span>
+              <b>{{money(activeInvoice.subtotal || activeInvoice.total)}}</b>
+            </div>
+            <div v-if="activeInvoice.discount" class="invoice-totals-row">
+              <span>Réduction</span>
+              <b style="color:#dc2626;">-{{money(activeInvoice.discount)}}</b>
+            </div>
+            <div v-if="activeInvoice.shipping" class="invoice-totals-row">
+              <span>Livraison</span>
+              <b>+{{money(activeInvoice.shipping)}}</b>
+            </div>
+            <div class="invoice-totals-row grand">
+              <span>TOTAL NET (MAD)</span>
+              <span>{{money(activeInvoice.total)}}</span>
+            </div>
+            <div style="font-size:11px; text-align:right; color:#666; margin-top:6px;">
+              Paiement : <b>{{activeInvoice.payment || 'Espèces'}}</b>
+            </div>
+          </div>
+
+          <div class="invoice-footer">
+            <p style="margin:0 0 4px; font-weight:700;">Merci pour votre confiance !</p>
+            <p style="margin:0; font-size:11px;">Alpha Shop07 — Document généré automatiquement</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
