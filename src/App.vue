@@ -78,8 +78,9 @@ function sendWhatsAppOrderMessage(sale) {
   const total = money(sale.total)
   const trackingText = sale.shipment?.tracking ? `\n📦 *N° Suivi Ozon Express :* ${sale.shipment.tracking}` : ''
   const itemsText = (sale.items || []).map(i => `- ${i.name} (x${i.quantity})`).join('\n')
+  const invoiceLink = `${window.location.origin}/?invoice=${encodeURIComponent(sale.number)}`
 
-  const message = `Bonjour ${c.name || 'Cher client'},\n\nVotre commande *${sale.number}* chez *${settings.value.business || 'Alpha Shop07'}* a bien été enregistrée !\n\n📋 *Articles :*\n${itemsText}\n\n💰 *Total à payer :* ${total}${trackingText}\n\nMerci pour votre confiance ! 🙏`
+  const message = `Bonjour ${c.name || 'Cher client'},\n\nVoici votre document de facture officielle *${sale.number}* chez *${settings.value.business || 'Alpha Shop07'}* :\n\n📄 *Voir/Télécharger votre Facture :*\n${invoiceLink}\n\n📋 *RésuméCommande :*\n${itemsText}\n\n💰 *Total Net :* ${total}${trackingText}\n\nMerci pour votre confiance ! 🙏`
 
   const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`
   window.open(url, '_blank')
@@ -339,7 +340,19 @@ async function submitOrder() {
   }
 }
 async function verifyShipment(sale) { try { const result = await getOzonParcelInfo({ customerId: settings.value.ozonId, apiKey: settings.value.ozonKey, trackingNumber: sale.shipment?.tracking }); await shop.attachShipment(sale.id, { tracking: result['TRACKING-NUMBER'] || sale.shipment.tracking, city: result.CITY_NAME, status: result.STATUS || 'verified', response: result }); shop.notify(`Colis vérifié : ${result['TRACKING-NUMBER'] || sale.shipment.tracking}`) } catch (error) { shop.notify(`Vérification Ozon impossible : ${error.message}`) } }
-onMounted(() => shop.init())
+onMounted(async () => {
+  await shop.init()
+  const params = new URLSearchParams(window.location.search)
+  const invNum = params.get('invoice')
+  if (invNum) {
+    const sale = shop.sales.find(s => String(s.number).toLowerCase() === String(invNum).toLowerCase())
+    if (sale) {
+      activeInvoice.value = sale
+      invoiceModal.value = true
+      authenticated.value = true
+    }
+  }
+})
 </script>
 
 <template>
