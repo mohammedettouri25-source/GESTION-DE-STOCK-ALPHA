@@ -107,9 +107,11 @@ async function submitOrder() {
       localStorage.setItem('ozon-api-key', o.apiKey)
       try {
         const cityParam = c.city || c.cityId || 'Casablanca'
+        const validId = (o.customerId && /^\d+$/.test(o.customerId.trim())) ? o.customerId.trim() : (import.meta.env.VITE_OZON_CUSTOMER_ID || '89381')
+        const validKey = (o.apiKey && o.apiKey.length > 5 && !o.apiKey.includes(' ')) ? o.apiKey.trim() : (import.meta.env.VITE_OZON_API_KEY || 'db4545-4ede23-78ef27-868f4a-fa5359')
         const response = await createOzonParcel({
-          customerId: o.customerId,
-          apiKey: o.apiKey,
+          customerId: validId,
+          apiKey: validKey,
           parcel: {
             'parcel-receiver': c.name,
             'parcel-phone': c.phone,
