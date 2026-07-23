@@ -12,6 +12,15 @@ function onCitySelect() {
   }
 }
 
+function onCityInput() {
+  const query = (order.value.customer.city || '').trim().toLowerCase()
+  if (!query) return
+  const match = OZON_CITIES.find(c => c.name.toLowerCase() === query || c.name.toLowerCase().includes(query))
+  if (match) {
+    order.value.customer.cityId = match.id
+  }
+}
+
 const shop = useShop()
 const mobile = ref(false)
 const mobileCartSheet = ref(false)
@@ -940,15 +949,28 @@ onMounted(async () => {
           <label>Téléphone<input v-model="order.customer.phone" placeholder="0612345678" :required="order.sendOzon"/></label>
         </div>
         <div class="two">
-          <label>Ville Ozon Express
+          <label>Saisir la Ville (Recherche Texte / Auto-complétion)
+            <input
+              v-model="order.customer.city"
+              list="ozon-cities-list"
+              placeholder="Tapez pour chercher (Ex: Casablanca, Rabat...)"
+              @input="onCityInput"
+              :required="order.sendOzon"
+            />
+            <datalist id="ozon-cities-list">
+              <option v-for="c in OZON_CITIES" :key="c.id" :value="c.name">
+                {{ c.name }} (ID: {{ c.id }})
+              </option>
+            </datalist>
+          </label>
+          <label>Ville Ozon Express (Liste Déroulante / Select)
             <select v-model="order.customer.cityId" @change="onCitySelect" :required="order.sendOzon">
-              <option value="">-- Choisir une ville Ozon --</option>
+              <option value="">-- Sélectionner dans la liste --</option>
               <option v-for="c in OZON_CITIES" :key="c.id" :value="c.id">
                 {{ c.name }} (ID: {{ c.id }})
               </option>
             </select>
           </label>
-          <label>Ville (Confirmation)<input v-model="order.customer.city" placeholder="Casablanca"/></label>
         </div>
         <label>Adresse complète<input v-model="order.customer.address" placeholder="123 Rue Hassan II, Quartier Maarif" :required="order.sendOzon"/></label>
         <label>Note de livraison<input v-model="order.customer.note" placeholder="Appeler avant livraison"/></label>
