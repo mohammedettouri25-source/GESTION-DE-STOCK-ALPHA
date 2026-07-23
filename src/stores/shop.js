@@ -89,6 +89,20 @@ export const useShop = defineStore('shop', {
         if (i < 0) this.products.push(p)
         else this.products.splice(i, 1, p)
         await this.queue('products', p)
+
+        // Direct push to Supabase products table
+        if (supabase) {
+          supabase.from('products').upsert({
+            id: p.id,
+            name: p.name || '',
+            sku: p.sku || null,
+            barcode: p.barcode || null,
+            price: p.price,
+            purchase_price: p.purchasePrice,
+            description: p.category || ''
+          }, { onConflict: 'id' }).then(() => {}).catch(() => {})
+        }
+
         this.notify(product.id ? 'Produit mis à jour ✓' : 'Produit créé ✓')
       } catch (error) {
         console.error('saveProduct error:', error)
@@ -103,6 +117,11 @@ export const useShop = defineStore('shop', {
         // Remove any cart lines for this product
         this.cart = this.cart.filter(c => c.productId !== id)
         await this.queue('products', { id, deleted: true })
+
+        if (supabase) {
+          supabase.from('products').delete().eq('id', id).then(() => {}).catch(() => {})
+        }
+
         this.notify('Produit supprimé')
       } catch (error) {
         console.error('removeProduct error:', error)
