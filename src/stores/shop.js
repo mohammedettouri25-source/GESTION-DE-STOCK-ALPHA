@@ -45,6 +45,11 @@ export const useShop = defineStore('shop', {
       const purchases = Number(sup.totalPurchases) || 0
       const paid = Number(sup.totalPaid) || 0
       return sum + Math.max(0, purchases - paid)
+    }, 0),
+    totalCustomerDebt: s => (s.customers || []).reduce((sum, c) => {
+      const purchases = Number(c.totalPurchases) || 0
+      const paid = Number(c.totalPaid) || 0
+      return sum + Math.max(0, purchases - paid)
     }, 0)
   },
 
@@ -737,12 +742,6 @@ export const useShop = defineStore('shop', {
       }
     },
 
-    // Compute total customer debt across all customers
-    get totalCustomerDebt() {
-      return this.customers.reduce((sum, c) => {
-        return sum + Math.max(0, (Number(c.totalPurchases) || 0) - (Number(c.totalPaid) || 0))
-      }, 0)
-    },
 
     async saveSupplier(supplier) {
       try {
