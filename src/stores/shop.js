@@ -635,7 +635,7 @@ export const useShop = defineStore('shop', {
 
     async saveCustomer(customer) {
       try {
-        const c = {
+        const c = JSON.parse(JSON.stringify({
           ...customer,
           id: customer.id || crypto.randomUUID(),
           name: customer.name || '',
@@ -643,7 +643,7 @@ export const useShop = defineStore('shop', {
           city: customer.city || '',
           address: customer.address || '',
           createdAt: customer.createdAt || new Date().toISOString()
-        }
+        }))
         await localDb.customers.put(c)
         const idx = this.customers.findIndex(x => x.id === c.id)
         if (idx < 0) this.customers.unshift(c)
@@ -680,21 +680,21 @@ export const useShop = defineStore('shop', {
 
         if (existing) {
           // Accumulate credit on existing customer
-          const updated = {
+          const updated = JSON.parse(JSON.stringify({
             ...existing,
             totalPurchases: (Number(existing.totalPurchases) || 0) + creditAmount,
             creditHistory: [
               ...(existing.creditHistory || []),
               { saleNumber, amount: creditAmount, date: new Date().toISOString() }
             ]
-          }
+          }))
           await localDb.customers.put(updated)
           const idx = this.customers.findIndex(x => x.id === updated.id)
           if (idx >= 0) this.customers.splice(idx, 1, updated)
           await this.queue('customers', updated)
         } else {
           // Auto-create customer with initial credit
-          const newCustomer = {
+          const newCustomer = JSON.parse(JSON.stringify({
             id: crypto.randomUUID(),
             name,
             phone,
@@ -706,7 +706,7 @@ export const useShop = defineStore('shop', {
               { saleNumber, amount: creditAmount, date: new Date().toISOString() }
             ],
             createdAt: new Date().toISOString()
-          }
+          }))
           await localDb.customers.put(newCustomer)
           this.customers.unshift(newCustomer)
           await this.queue('customers', newCustomer)
@@ -725,14 +725,14 @@ export const useShop = defineStore('shop', {
         const currentDebt = Math.max(0, (Number(customer.totalPurchases) || 0) - (Number(customer.totalPaid) || 0))
         const payment = Math.min(paymentAmount, currentDebt)
 
-        const updated = {
+        const updated = JSON.parse(JSON.stringify({
           ...customer,
           totalPaid: (Number(customer.totalPaid) || 0) + payment,
           creditHistory: [
             ...(customer.creditHistory || []),
             { saleNumber: 'PAIEMENT', amount: -payment, date: new Date().toISOString() }
           ]
-        }
+        }))
         await localDb.customers.put(updated)
         this.customers.splice(idx, 1, updated)
         await this.queue('customers', updated)
