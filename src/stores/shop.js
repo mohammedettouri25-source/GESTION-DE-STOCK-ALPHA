@@ -226,7 +226,9 @@ export const useShop = defineStore('shop', {
         const raw = JSON.parse(JSON.stringify(sale))
         await localDb.sales.put(raw)
         if (this.online) {
-          await supabase.from('sales').upsert([raw]).catch(() => {})
+          try {
+            await supabase.from('sales').upsert([raw])
+          } catch (_) {}
         }
         this.notify(`Commande ${sale.number || sale.id} ${status === 'confirmée' ? 'confirmée par WhatsApp ✓' : 'mise à jour'}`)
       }
