@@ -739,7 +739,7 @@ function addEntry(type) {
     ? { name: '', phone: '', city: '', address: '' }
     : type === 'supplier'
       ? { name: '', phone: '', company: '', email: '', totalPurchases: 0, totalPaid: 0 }
-      : { category: 'Loyer (Rent)', amount: 0, note: '', date: new Date().toISOString().slice(0, 10) }
+      : { category: 'Achat de Stock', supplierId: '', totalInvoice: 0, amount: 0, note: '', date: new Date().toISOString().slice(0, 10) }
 }
 
 function editEntry(type, item) {
@@ -1359,8 +1359,19 @@ onMounted(async () => {
           </div>
           <div v-if="filteredFinanceExpenses.length" class="table">
             <div v-for="expense in filteredFinanceExpenses" :key="expense.id || expense.category">
-              <span><b>{{expense.category}}</b><small>{{expense.date}}</small></span>
-              <span>{{expense.note||'—'}}</span>
+              <span>
+                <b>{{expense.category}}</b>
+                <small v-if="expense.supplierId && shop.suppliers.find(s => s.id === expense.supplierId)" style="display:block; color:#2563eb;">
+                  Fournisseur : {{ shop.suppliers.find(s => s.id === expense.supplierId).name }}
+                </small>
+                <small>{{expense.date}}</small>
+              </span>
+              <span>
+                {{expense.note||'—'}}
+                <small v-if="expense.totalInvoice && expense.totalInvoice > expense.amount" style="display:block; color:#dc2626; font-size:11px;">
+                  Facture: {{money(expense.totalInvoice)}} · Reste Dû: {{money(expense.totalInvoice - expense.amount)}}
+                </small>
+              </span>
               <strong style="color: #dc2626;">-{{money(expense.amount)}}</strong>
               <button class="icon" style="color:#dc2626" @click.stop="deleteEntry('expense', expense.id)"><Trash2 :size="15"/></button>
             </div>
@@ -1973,10 +1984,62 @@ onMounted(async () => {
                 <option v-for="cat in EXPENSE_CATEGORIES" :key="cat" :value="cat">{{ cat }}</option>
               </select>
             </label>
-            <label>Montant (MAD)<input v-model.number="entry.amount" type="number" min="0" required/></label>
+            <label>Montant Payé / Réglé (MAD)
+              <input v-model.number="entry.amount" type="number" min="0" required placeholder="Ex: 2000"/>
+            </label>
           </div>
-          <label>Date<input v-model="entry.date" type="date"/></label>
-          <label>Note / Description<input v-model="entry.note" placeholder="Ex: Loyer du mois, Pub Facebook, etc."/></label>
+
+          <!-- Section Spéciale : Achat de Stock chez Fournisseur -->
+          <div v-if="entry.category === 'Achat de Stock'" class="payment-credit-card" style="margin: 12px 0 16px; background:#fafafa; border:1px solid #e4e4e7; padding:12px; border-radius:8px;">
+            <p class="eyebrow" style="color:#2563eb; margin-bottom:8px;">DÉTAILS ACHAT STOCK & FOURNISSEUR</p>
+            <label style="display:block; margin-bottom:10px;">
+              <span style="font-weight:600; font-size:12px; margin-bottom:4px; display:block;">Sélectionner le Fournisseur (المورد)</span>
+              <select v-model="entry.supplierId" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">
+                <option value="">-- Fournisseur Occasionnel / Sans Fiche --</option>
+                <option v-for="s in shop.suppliers" :key="s.id" :value="s.id">
+                  {{ s.name }} {{ s.company ? '(' + s.company + ')' : '' }} — Dette Actuelle: {{ money(Number(s.totalPurchases || 0) - Number(s.totalPaid || 0)) }}
+                </option>
+              </select>
+            </label>
+
+            <div class="two">
+              <label>Montant Total Facture Stock (MAD)
+                <input
+                  v-model.number="entry.totalInvoice"
+                  type="number"
+                  min="0"
+                  :placeholder="(entry.amount || 0).toString()"
+                />
+              </label>
+              <label>Reste Dû / Dette Générée (MAD)
+                <input
+                  type="text"
+                  readonly
+                  :value="money(Math.max(0, (Number(entry.totalInvoice || entry.amount || 0)) - (Number(entry.amount) || 0)))"
+                  style="background:#f1f5f9; font-weight:700; color:#dc2626;"
+                />
+              </label>
+            </div>
+
+            <div
+              v-if="entry.supplierId"
+              class="credit-warning-badge"
+              :class="(Number(entry.totalInvoice || entry.amount || 0) - Number(entry.amount || 0)) > 0 ? 'danger' : 'success'"
+              style="margin-top:8px;"
+            >
+              <span v-if="(Number(entry.totalInvoice || entry.amount || 0) - Number(entry.amount || 0)) > 0">
+                🔴 Le fournisseur aura un reste à payer de <b>{{ money((Number(entry.totalInvoice || entry.amount || 0)) - (Number(entry.amount) || 0)) }}</b> (كايسالونا)
+              </span>
+              <span v-else>
+                🟢 Facture réglée à 100% (0 MAD كايسالنا)
+              </span>
+            </div>
+          </div>
+
+          <div class="two">
+            <label>Date<input v-model="entry.date" type="date"/></label>
+            <label>Note / Description<input v-model="entry.note" placeholder="Ex: Loyer du mois, Pub Facebook, etc."/></label>
+          </div>
         </template>
         <div class="modal-actions">
           <button type="button" class="quiet" @click="entryModal=''">Annuler</button>

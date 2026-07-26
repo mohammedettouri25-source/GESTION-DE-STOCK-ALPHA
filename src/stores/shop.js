@@ -704,11 +704,16 @@ export const useShop = defineStore('shop', {
 
     async saveExpense(expense) {
       try {
+        const amount = Number(expense.amount) || 0
+        const totalInvoice = Number(expense.totalInvoice) >= amount ? Number(expense.totalInvoice) : amount
+
         const e = {
           ...expense,
           id: expense.id || crypto.randomUUID(),
           category: expense.category || 'Autre',
-          amount: Number(expense.amount) || 0,
+          amount,
+          totalInvoice,
+          supplierId: expense.supplierId || null,
           note: expense.note || '',
           date: expense.date || new Date().toISOString().slice(0, 10),
           createdAt: expense.createdAt || new Date().toISOString()
@@ -718,6 +723,22 @@ export const useShop = defineStore('shop', {
         if (idx < 0) this.expenses.unshift(e)
         else this.expenses.splice(idx, 1, e)
         await this.queue('expenses', e)
+
+        // Automatically update supplier purchase & debt if supplierId is linked
+        if (e.supplierId) {
+          const sIdx = this.suppliers.findIndex(x => x.id === e.supplierId)
+          if (sIdx >= 0) {
+            const supplier = JSON.parse(JSON.stringify(this.suppliers[sIdx]))
+            supplier.totalPurchases = (Number(supplier.totalPurchases) || 0) + totalInvoice
+            supplier.totalPaid = (Number(supplier.totalPaid) || 0) + amount
+            supplier.balanceOwed = Math.max(0, supplier.totalPurchases - supplier.totalPaid)
+
+            await localDb.suppliers?.put(supplier).catch(() => {})
+            this.suppliers.splice(sIdx, 1, supplier)
+            await this.queue('suppliers', supplier)
+          }
+        }
+
         this.notify('Dépense enregistrée ✓')
       } catch (err) {
         this.notify(`Erreur : ${err.message}`)
