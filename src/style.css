@@ -540,11 +540,11 @@ h2 {
 }
 
 .bars {
-  height: 260px;
+  height: 230px;
   display: flex;
   align-items: flex-end;
   gap: 3%;
-  padding: 70px 12px 28px;
+  padding: 55px 12px 28px;
   border-bottom: 1px solid #ececea;
   width: 100%;
   box-sizing: border-box;

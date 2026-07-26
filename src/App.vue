@@ -546,7 +546,7 @@ const salesPerformanceChart = computed(() => {
 
   return result.map(r => ({
     ...r,
-    heightPct: Math.max(10, Math.round((r.revenue / maxRev) * 100))
+    heightPct: Math.max(10, Math.round((r.revenue / maxRev) * 65))
   }))
 })
 
