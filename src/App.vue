@@ -582,7 +582,7 @@ const openaiKey = ref(localStorage.getItem('openai-api-key') || import.meta.env.
 const waSubTab = ref('inbox') // 'inbox' | 'config'
 
 const whatsappSettings = ref({
-  phone: localStorage.getItem('alpha-wa-phone') || '212600000000',
+  phone: localStorage.getItem('alpha-wa-phone') || '212641432859',
   token: localStorage.getItem('alpha-wa-token') || 'EAAG...',
   phoneId: localStorage.getItem('alpha-wa-phoneid') || '1029384756',
   autoReply: true,
