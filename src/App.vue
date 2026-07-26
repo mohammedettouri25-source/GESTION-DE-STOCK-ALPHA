@@ -475,7 +475,34 @@ const actualPaidAmount = computed(() => {
 const remainingBalance = computed(() => {
   return Math.max(0, orderTotal.value - actualPaidAmount.value)
 })
-const nav = [['dashboard', `Vue d'ensemble`, LayoutDashboard], ['products', 'Produits', Package], ['pos', 'Point de vente', ShoppingCart], ['orders', 'Commandes', Truck], ['customers', 'Clients', Users], ['suppliers', 'Fournisseurs', Factory], ['finance', 'Finance', WalletCards], ['profits', 'Rapport Profits 📈', TrendingUp], ['reports', 'Rapports', BarChart3], ['settings', 'Réglages', Settings]]
+const navItems = {
+  fr: [
+    ['dashboard', "Vue d'ensemble", LayoutDashboard],
+    ['products', 'Produits', Package],
+    ['pos', 'Point de vente', ShoppingCart],
+    ['orders', 'Commandes', Truck],
+    ['customers', 'Clients', Users],
+    ['suppliers', 'Fournisseurs', Factory],
+    ['finance', 'Finance & Trésorerie', WalletCards],
+    ['profits', 'Rapport Profits 📈', TrendingUp],
+    ['reports', 'Rapports', BarChart3],
+    ['settings', 'Réglages', Settings]
+  ],
+  ar: [
+    ['dashboard', 'لوحة التحكم', LayoutDashboard],
+    ['products', 'المنتجات', Package],
+    ['pos', 'نقطة البيع', ShoppingCart],
+    ['orders', 'الطلبيات', Truck],
+    ['customers', 'الزبناء', Users],
+    ['suppliers', 'الموردين', Factory],
+    ['finance', 'المالية والمصاريف', WalletCards],
+    ['profits', 'تقرير الأرباح 📈', TrendingUp],
+    ['reports', 'التقارير', BarChart3],
+    ['settings', 'الإعدادات', Settings]
+  ]
+}
+
+const nav = computed(() => navItems[shop.language] || navItems.fr)
 
 // --- Daily Profit Reports State & Calculations ---
 const profitPreset = ref('month')
@@ -709,8 +736,31 @@ const expenseList = loadList('alpha-expenses', [])
 const entryModal = ref('')
 const entry = ref({})
 const settings = ref({ business: localStorage.getItem('alpha-business') || 'Alpha Shop', currency: 'MAD', ozonId: localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '', ozonKey: localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || '', pin: localStorage.getItem('alpha-pin') || 'ALPHASHOP2026@@' })
-const labels = { fr: { title: `Aujourd'hui`, sales: 'Ventes du jour', month: 'Ventes du mois', stock: 'Stock à surveiller', profit: 'Bénéfice estimé' }, ar: { title: 'اليوم', sales: 'مبيعات اليوم', month: 'مبيعات الشهر', stock: 'مخزون منخفض', profit: 'الربح المقدر' } }
-const t = computed(() => labels[shop.language])
+const labels = {
+  fr: {
+    title: `Aujourd'hui`,
+    sales: 'Ventes du jour',
+    month: 'Ventes du mois',
+    stock: 'Stock à surveiller',
+    profit: 'Bénéfice estimé',
+    profitsTitle: 'Rapport de Profits Journaliers',
+    supplierDebtTitle: 'Total Dettes Fournisseurs',
+    detteLabel: 'Dette',
+    creditLabel: 'Crédit'
+  },
+  ar: {
+    title: 'اليوم',
+    sales: 'مبيعات اليوم',
+    month: 'مبيعات الشهر',
+    stock: 'مخزون منخفض',
+    profit: 'الربح المقدر',
+    profitsTitle: 'تقرير الأرباح اليومية',
+    supplierDebtTitle: 'مجموع ديون الموردين',
+    detteLabel: 'دين (كايسالونا)',
+    creditLabel: 'سلف (كاندسالوه)'
+  }
+}
+const t = computed(() => labels[shop.language] || labels.fr)
 const filtered = computed(() => shop.products.filter(p => `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(shop.query.toLowerCase())))
 
 // Bug fix: reset query when switching views so search doesn't bleed across sections

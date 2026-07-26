@@ -2121,4 +2121,52 @@ h2 {
   font-size: 12px;
 }
 
+/* Arabic RTL Layout Alignment Fixes */
+.shell.arabic {
+  direction: rtl;
+  grid-template-columns: 1fr 248px;
+}
+
+.shell.arabic aside {
+  left: auto;
+  right: 0;
+  border-right: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.shell.arabic main {
+  margin-left: 0;
+  margin-right: 248px;
+}
+
+.shell.arabic .mobile-close-btn {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.shell.arabic .crumb b {
+  transform: rotate(180deg);
+  display: inline-block;
+}
+
+.shell.arabic input[type="number"],
+.shell.arabic .inline-price-input {
+  direction: ltr;
+}
+
+@media (max-width: 900px) {
+  .shell.arabic {
+    grid-template-columns: 1fr;
+  }
+  .shell.arabic main {
+    margin-right: 0;
+  }
+  .shell.arabic aside {
+    transform: translateX(100%);
+  }
+  .shell.arabic aside.open {
+    transform: translateX(0);
+  }
+}
+
 
