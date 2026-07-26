@@ -367,6 +367,11 @@ export const useShop = defineStore('shop', {
           }
         }
 
+        // Revert customer credit/debt when a sale is deleted
+        if (sale.remainingBalance > 0 && sale.customer && sale.customer.name) {
+          await this.revertCustomerCredit(sale.customer, sale.remainingBalance, sale.number)
+        }
+
         await localDb.sales.delete(saleId)
         this.sales.splice(index, 1)
 
@@ -713,6 +718,33 @@ export const useShop = defineStore('shop', {
         }
       } catch (err) {
         console.error('updateCustomerCredit error:', err)
+      }
+    },
+
+    // Revert customer credit when a sale is deleted
+    async revertCustomerCredit(saleCustomer, creditAmount, saleNumber) {
+      try {
+        const phone = (saleCustomer.phone || '').trim()
+        const name = (saleCustomer.name || '').trim()
+        if (!name && !phone) return
+
+        let existing = this.customers.find(c =>
+          (phone && c.phone === phone) || (name && c.name === name)
+        )
+
+        if (existing) {
+          const updated = JSON.parse(JSON.stringify({
+            ...existing,
+            totalPurchases: Math.max(0, (Number(existing.totalPurchases) || 0) - creditAmount),
+            creditHistory: (existing.creditHistory || []).filter(h => h.saleNumber !== saleNumber)
+          }))
+          await localDb.customers.put(updated)
+          const idx = this.customers.findIndex(x => x.id === updated.id)
+          if (idx >= 0) this.customers.splice(idx, 1, updated)
+          await this.queue('customers', updated)
+        }
+      } catch (err) {
+        console.error('revertCustomerCredit error:', err)
       }
     },
 
