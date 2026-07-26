@@ -5,6 +5,24 @@ import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCa
 import { createOzonParcel, getOzonParcelInfo } from './services/ozon'
 import { OZON_CITIES } from './services/ozonCities'
 
+// Order state (declared first so city helpers can safely reference order.value)
+const order = ref({
+  type: 'online', // 'online' | 'offline'
+  discount: 0,
+  shipping: 0,
+  paidAmount: null,
+  customer: { name: '', phone: '', cityId: '', city: '', address: '', note: '' },
+  sendOzon: true,
+  ozon: {
+    customerId: localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '89381',
+    apiKey: localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || 'db4545-4ede23-78ef27-868f4a-fa5359',
+    declaredValue: '',
+    open: '1',
+    fragile: '0',
+    replace: '0'
+  }
+})
+
 const citySearchOpen = ref(false)
 
 const popularCities = [
@@ -85,6 +103,11 @@ const aiPrompt = ref('')
 const aiAnalyzing = ref(false)
 
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
+const authenticated = ref(false)
+const loginPassword = ref('')
+const loginError = ref('')
+const showPass = ref(false)
+const masterPin = ref(localStorage.getItem('alpha-pin') || 'ALPHASHOP2026@@')
 
 function checkAuthSession() {
   const auth = localStorage.getItem('alpha-auth') === 'true'
@@ -103,17 +126,15 @@ function checkAuthSession() {
       }
       return false
     }
+    authenticated.value = true
     return true
   }
   authenticated.value = false
   return false
 }
 
-const authenticated = ref(checkAuthSession())
-const loginPassword = ref('')
-const loginError = ref('')
-const showPass = ref(false)
-const masterPin = ref(localStorage.getItem('alpha-pin') || 'ALPHASHOP2026@@')
+// Initial evaluation
+authenticated.value = checkAuthSession()
 
 function handleLogin() {
   if (loginPassword.value.trim() === masterPin.value) {
@@ -433,22 +454,6 @@ async function removeCurrentProduct() {
     productModal.value = false
   }
 }
-const order = ref({
-  type: 'online', // 'online' | 'offline'
-  discount: 0,
-  shipping: 0,
-  paidAmount: null,
-  customer: { name: '', phone: '', cityId: '', city: '', address: '', note: '' },
-  sendOzon: true,
-  ozon: {
-    customerId: localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '89381',
-    apiKey: localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || 'db4545-4ede23-78ef27-868f4a-fa5359',
-    declaredValue: '',
-    open: '1',
-    fragile: '0',
-    replace: '0'
-  }
-})
 
 function setSaleType(type) {
   order.value.type = type
