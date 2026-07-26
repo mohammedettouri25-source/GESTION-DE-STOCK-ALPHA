@@ -217,6 +217,21 @@ export const useShop = defineStore('shop', {
       this.cart = []
     },
 
+    async confirmSaleStatus(saleId, status = 'confirmée', notes = '') {
+      const sale = this.sales.find(s => s.id === saleId)
+      if (sale) {
+        sale.status = status
+        sale.whatsappConfirmedAt = new Date().toISOString()
+        if (notes) sale.whatsappNotes = notes
+        const raw = JSON.parse(JSON.stringify(sale))
+        await localDb.sales.put(raw)
+        if (this.online) {
+          await supabase.from('sales').upsert([raw]).catch(() => {})
+        }
+        this.notify(`Commande ${sale.number || sale.id} ${status === 'confirmée' ? 'confirmée par WhatsApp ✓' : 'mise à jour'}`)
+      }
+    },
+
     async checkout(payment = 'Espèces', details = {}) {
       if (!this.cart.length) return this.notify('Ajoutez au moins un article au panier')
       if (this.cart.some(x => x.quantity > x.available)) return this.notify('Quantité indisponible en stock')

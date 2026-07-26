@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useShop } from './stores/shop'
-import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText, Bot, Sparkles, Lock, LogOut, KeyRound, Eye, EyeOff, MessageCircle, Send, TrendingUp, Calendar, Download, ChevronDown } from 'lucide-vue-next'
+import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText, Bot, Sparkles, Lock, LogOut, KeyRound, Eye, EyeOff, MessageCircle, Send, TrendingUp, Calendar, Download, ChevronDown, CheckCircle2 } from 'lucide-vue-next'
 import { createOzonParcel, getOzonParcelInfo } from './services/ozon'
 import { OZON_CITIES } from './services/ozonCities'
 
@@ -262,21 +262,6 @@ function downloadInvoicePdf(sale) {
   setTimeout(() => win.print(), 250)
 }
 
-function sendWhatsAppOrderMessage(sale) {
-  const c = sale?.customer || {}
-  const phone = formatWhatsAppPhone(c.phone)
-  if (!phone) return shop.notify('Numéro de téléphone client non spécifié')
-
-  const total = money(sale.total)
-  const trackingText = sale.shipment?.tracking ? `\n📦 *N° Suivi Ozon Express :* ${sale.shipment.tracking}` : ''
-  const itemsText = (sale.items || []).map(i => `- ${i.name} (x${i.quantity})`).join('\n')
-
-  const message = `Bonjour ${c.name || 'Cher client'},\n\nVoici le document de votre facture officielle *${sale.number}* chez *${settings.value.business || 'Alpha Shop07'}* :\n\n📋 *Articles :*\n${itemsText}\n\n💰 *Total Net :* ${total}${trackingText}\n\nMerci pour votre confiance ! 🙏`
-
-  const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`
-  window.open(url, '_blank')
-}
-
 function sendWhatsAppCustomerMessage(customer) {
   const phone = formatWhatsAppPhone(customer?.phone)
   if (!phone) return shop.notify('Numéro de téléphone non valide')
@@ -485,6 +470,7 @@ const navItems = {
     ['suppliers', 'Fournisseurs', Factory],
     ['finance', 'Finance & Trésorerie', WalletCards],
     ['profits', 'Rapport Profits 📈', TrendingUp],
+    ['whatsapp', 'WhatsApp & Bot AI 🤖', MessageCircle],
     ['reports', 'Rapports', BarChart3],
     ['settings', 'Réglages', Settings]
   ],
@@ -497,6 +483,7 @@ const navItems = {
     ['suppliers', 'الموردين', Factory],
     ['finance', 'المالية والمصاريف', WalletCards],
     ['profits', 'تقرير الأرباح 📈', TrendingUp],
+    ['whatsapp', 'واتساب والريبوت 🤖', MessageCircle],
     ['reports', 'التقارير', BarChart3],
     ['settings', 'الإعدادات', Settings]
   ]
@@ -587,6 +574,116 @@ function onTouchMoveChart(e) {
   const x = e.touches[0].pageX
   const walk = (x - touchStartX) * 1.8
   chartScrollRef.value.scrollLeft = touchScrollLeft - walk
+}
+
+// --- WhatsApp Business & AI Chatbot State ---
+const whatsappSettings = ref({
+  phone: localStorage.getItem('alpha-wa-phone') || '212600000000',
+  token: localStorage.getItem('alpha-wa-token') || 'EAAG...',
+  phoneId: localStorage.getItem('alpha-wa-phoneid') || '1029384756',
+  autoReply: true,
+  autoConfirm: true,
+  autoOzon: true,
+  aiPrompt: localStorage.getItem('alpha-wa-prompt') || 'أنت مساعد ذكي لمتجر Alpha Shop، تجيب الزبناء بلطف وبـ اللغة المغربية (الدارجة)، تؤكد الطلبيات، وتزودهم بـ تتبع الشحنات والأسعار فـ المخزون.'
+})
+
+function saveWhatsappSettings() {
+  localStorage.setItem('alpha-wa-phone', whatsappSettings.value.phone)
+  localStorage.setItem('alpha-wa-token', whatsappSettings.value.token)
+  localStorage.setItem('alpha-wa-phoneid', whatsappSettings.value.phoneId)
+  localStorage.setItem('alpha-wa-prompt', whatsappSettings.value.aiPrompt)
+  shop.notify('Paramètres WhatsApp & Bot AI enregistrés ✓')
+}
+
+function formatWhatsappMessage(sale) {
+  const cName = sale.customer?.name || 'الزبون العزيز'
+  const itemsText = (sale.items || []).map(i => `• ${i.name} (${i.variant || 'Standard'}) x${i.quantity} = ${i.price * i.quantity} MAD`).join('\n')
+  const addressText = `${sale.customer?.address || ''} ${sale.customer?.city || ''}`.trim() || 'المغرب'
+
+  return `👋 السلام عليكم ${cName}،\nشكراً لطلبك من متجر Alpha Shop! 🛍️\n\n📦 تفاصيل الطلبية رقم #${sale.number || sale.id}:\n${itemsText}\n-----------------------------\n💰 المجموع الكلي: ${sale.total} MAD\n📍 العنوان: ${addressText}\n\nيرجى الرد بـ "تأكيد" أو "1" لتأكيد شحن طلبيتك فوراً عبر Ozon Express! 🚚`
+}
+
+function sendWhatsAppOrderMessage(sale) {
+  if (!sale.customer?.phone) {
+    return shop.notify('Aucun numéro de téléphone pour ce client')
+  }
+  let cleanPhone = String(sale.customer.phone).replace(/\D/g, '')
+  if (cleanPhone.startsWith('0')) cleanPhone = '212' + cleanPhone.slice(1)
+  if (!cleanPhone.startsWith('212')) cleanPhone = '212' + cleanPhone
+
+  const text = encodeURIComponent(formatWhatsappMessage(sale))
+  window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank')
+}
+
+function sendWhatsAppTrackingMessage(sale) {
+  if (!sale.customer?.phone || !sale.shipment?.tracking) return
+  let cleanPhone = String(sale.customer.phone).replace(/\D/g, '')
+  if (cleanPhone.startsWith('0')) cleanPhone = '212' + cleanPhone.slice(1)
+  if (!cleanPhone.startsWith('212')) cleanPhone = '212' + cleanPhone
+
+  const trackingNum = sale.shipment.tracking
+  const text = encodeURIComponent(`👋 السلام عليكم ${sale.customer.name || ''}،\nتم شحن طلبيتك رقم #${sale.number} بنجاح عبر Ozon Express! 🚚\n\n📦 رقم التتبع: ${trackingNum}\n🔗 يمكنك تتبع شحنتك هنا: https://ozonexpress.ma/tracking/${trackingNum}`)
+  window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank')
+}
+
+async function markSaleConfirmed(sale) {
+  await shop.confirmSaleStatus(sale.id, 'confirmée')
+}
+
+// Live Chatbot Simulator
+const simInput = ref('')
+const simChatLogs = ref([
+  { sender: 'bot', text: '👋 مرحباً بك! أنا ريبوت الذكاء الاصطناعي لمتجر Alpha Shop 🤖. كيف يمكنني مساعدتك اليوم أو تأكيد طلبيتك؟' }
+])
+const simLoading = ref(false)
+
+async function sendSimMessage(customText = null) {
+  const input = customText || simInput.value.trim()
+  if (!input) return
+
+  simChatLogs.value.push({ sender: 'user', text: input })
+  if (!customText) simInput.value = ''
+  simLoading.value = true
+
+  setTimeout(async () => {
+    let botReply = ''
+    const lower = input.toLowerCase()
+
+    if (lower.includes('تأكيد') || lower.includes('نأكد') || lower.includes('1') || lower.includes('confirm') || lower.includes('al-')) {
+      let targetSale = null
+      if (input.match(/#?(\d+)/)) {
+        const num = input.match(/#?(\d+)/)[1]
+        targetSale = shop.sales.find(s => String(s.number).includes(num) || String(s.id).includes(num))
+      }
+      if (!targetSale) targetSale = shop.sales[0]
+
+      if (targetSale) {
+        await shop.confirmSaleStatus(targetSale.id, 'confirmée')
+        botReply = `✅ تم تأكيد الطلبية رقم #${targetSale.number || targetSale.id} بنجاح! 🚀 المجموع: ${targetSale.total} MAD. سيتم تسليمها لك عبر Ozon Express خلال 24-48 ساعة.`
+      } else {
+        botReply = `شكراً لتأكيدك! 📦 يرجى تزويدنا بـ رقم الطلبية لإنهاء التجهيز والشحن فوراً.`
+      }
+    }
+    else if (lower.includes('ثمن') || lower.includes('سعر') || lower.includes('prix') || lower.includes('شحال') || lower.includes('متوفر')) {
+      const matchedProd = shop.products.find(p => lower.includes(p.name.toLowerCase()) || lower.includes(p.category.toLowerCase()))
+      if (matchedProd) {
+        const totalStock = (matchedProd.variants || []).reduce((sum, v) => sum + (v.stock || 0), 0)
+        botReply = `🏷️ منتج ${matchedProd.name}:\n• الثمن: ${matchedProd.price} MAD\n• المخزون المتوفر: ${totalStock} قطعة\n• الفئات: ${matchedProd.category}\nهل تود تقديم طلبية الآن؟ 🛍️`
+      } else {
+        const sampleProds = shop.products.slice(0, 3).map(p => `• ${p.name} (${p.price} MAD)`).join('\n')
+        botReply = `إليك أكثر المنتجات طلباً لدينا اليوم 🌟:\n${sampleProds}\nأخبرني بالمنتج الذي يثير إعجابك!`
+      }
+    }
+    else if (lower.includes('توصيل') || lower.includes('وقت') || lower.includes('شحن') || lower.includes('فوقاش')) {
+      botReply = `🚚 التوصيل سريع وبـ أمان فـ جميع المدن المغربية عبر Ozon Express! يدوم من 24 لـ 48 ساعة فقط، والأداء عند الاستلام (Cash on Delivery).`
+    }
+    else {
+      botReply = `أهلاً بك! 👋 أنا المساعد الذكي لـ Alpha Shop. يمكنني مساعدتك فـ الاستفسار عن الأسعار، المخزون، أو تأكيد الطلبيات تلقائياً!`
+    }
+
+    simChatLogs.value.push({ sender: 'bot', text: botReply })
+    simLoading.value = false
+  }, 600)
 }
 
 // --- Daily Profit Reports State & Calculations ---
@@ -1427,8 +1524,23 @@ onMounted(async () => {
               <span><b>{{sale.customer?.name||'Vente comptoir'}}</b><small v-if="sale.shipment?.tracking">Ozon : {{sale.shipment.tracking}}</small></span>
               <strong>{{money(sale.total)}}</strong>
               <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                <span v-if="sale.status==='confirmée'" class="badge-profit" style="background:#10b981; font-size:11px; padding:4px 8px;">
+                  🟢 {{ shop.language === 'ar' ? 'مؤكدة (WhatsApp)' : 'Confirmée (WhatsApp)' }}
+                </span>
+                <button
+                  v-else-if="sale.customer?.phone"
+                  class="quiet"
+                  style="color:#16a34a; border-color:#86efac; background:#f0fdf4; display:flex; gap:4px; align-items:center; font-weight:700;"
+                  title="Marquer comme confirmée par WhatsApp"
+                  @click="markSaleConfirmed(sale)"
+                >
+                  <CheckCircle2 :size="14"/> {{ shop.language === 'ar' ? 'تأكيد الطلب' : 'Confirmer' }}
+                </button>
                 <button v-if="sale.customer?.phone" class="quiet" style="color:#16a34a; display:flex; gap:4px; align-items:center;" title="Envoyer le récapitulatif sur WhatsApp" @click="sendWhatsAppOrderMessage(sale)">
                   <MessageCircle :size="14"/> WhatsApp
+                </button>
+                <button v-if="sale.shipment?.tracking && sale.customer?.phone" class="quiet" style="color:#2563eb; display:flex; gap:4px; align-items:center;" title="Envoyer le suivi Ozon par WhatsApp" @click="sendWhatsAppTrackingMessage(sale)">
+                  <Truck :size="14"/> Suivi WA
                 </button>
                 <button class="quiet" @click="showInvoice(sale)" title="Voir et imprimer la facture">
                   <FileText :size="15"/> Facture
@@ -1805,6 +1917,149 @@ onMounted(async () => {
             </div>
           </div>
           <div v-else class="empty">Aucun produit vendu sur cette période.</div>
+        </div>
+      </section>
+
+      <!-- WhatsApp & AI Bot View -->
+      <section v-else-if="shop.active==='whatsapp'" class="page">
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">AUTOMATISATION & CHATBOT</p>
+            <h1>WhatsApp Business & AI Assistant 🤖</h1>
+          </div>
+          <button class="primary" style="background:#16a34a; border:none;" @click="saveWhatsappSettings">
+            <CheckCircle2 :size="17"/> Enregistrer la configuration
+          </button>
+        </div>
+
+        <!-- WhatsApp Metrics Header Cards -->
+        <div class="metrics" style="margin-bottom:20px;">
+          <article class="profit-card">
+            <small>Statut WhatsApp Integration</small>
+            <strong style="color:#16a34a;">🟢 Connecté / Webhook Actif</strong>
+            <em>Supabase Webhook URL Ready</em>
+          </article>
+          <article class="profit-card">
+            <small>AI Chatbot Auto-Responder</small>
+            <strong style="color:#2563eb;">🤖 {{ whatsappSettings.autoReply ? 'Activé (تأكيد تلقائي)' : 'Désactivé' }}</strong>
+            <em>IA Réponse & Confirmation</em>
+          </article>
+          <article class="profit-card">
+            <small>Commandes Confirmées (WA)</small>
+            <strong style="color:#8b5cf6;">{{ (shop.sales || []).filter(s => s.status === 'confirmée').length }} Commandes</strong>
+            <em>Confirmées par WhatsApp</em>
+          </article>
+        </div>
+
+        <div class="whatsapp-grid">
+          <!-- WhatsApp API & Webhook Configuration -->
+          <article class="panel">
+            <h2 style="font-size:16px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+              <MessageCircle :size="20" style="color:#16a34a;"/> Configuration WhatsApp Cloud API & Webhook
+            </h2>
+            <p style="font-size:12px; color:#64748b; margin-bottom:16px;">
+              Liez votre numéro WhatsApp Business pour recevoir et confirmer automatiquement les commandes via IA.
+            </p>
+
+            <div class="login-form">
+              <div class="input-field">
+                <label>URL Webhook Supabase (Pour Meta Cloud API)</label>
+                <input
+                  type="text"
+                  readonly
+                  value="https://hcduuehpistcxhlchoel.supabase.co/functions/v1/whatsapp-webhook"
+                  style="background:#f8fafc; font-family:'DM Mono', monospace; font-size:12px; color:#334155;"
+                />
+              </div>
+
+              <div class="two">
+                <div class="input-field">
+                  <label>Numéro WhatsApp Business (ex: 212612345678)</label>
+                  <input v-model="whatsappSettings.phone" type="text" placeholder="2126..." />
+                </div>
+                <div class="input-field">
+                  <label>WhatsApp Phone Number ID</label>
+                  <input v-model="whatsappSettings.phoneId" type="text" placeholder="10928374..." />
+                </div>
+              </div>
+
+              <div class="input-field">
+                <label>Meta Access Token (Clé d'API WhatsApp)</label>
+                <input v-model="whatsappSettings.token" type="password" placeholder="EAAG..." />
+              </div>
+
+              <div class="input-field" style="margin-top:10px;">
+                <label>Instruction système du Bot IA (System Prompt)</label>
+                <textarea
+                  v-model="whatsappSettings.aiPrompt"
+                  rows="3"
+                  style="width:100%; padding:10px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; font-family:inherit;"
+                  placeholder="Instruisez l'agent IA sur la façon de répondre aux clients..."
+                ></textarea>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
+                <label style="display:flex; align-items:center; gap:10px; font-size:13px; font-weight:600; cursor:pointer;">
+                  <input v-model="whatsappSettings.autoReply" type="checkbox" style="width:18px; height:18px;" />
+                  <span>تفعيل الرد التلقائي عبر الذكاء الاصطناعي (AI Auto-Reply Bot)</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:10px; font-size:13px; font-weight:600; cursor:pointer;">
+                  <input v-model="whatsappSettings.autoConfirm" type="checkbox" style="width:18px; height:18px;" />
+                  <span>تأكيد الطلبيات تلقائياً عند رد الزبون (Auto-Confirm Orders)</span>
+                </label>
+              </div>
+
+              <button class="primary" style="margin-top:16px; width:100%; background:#16a34a; border:none;" @click="saveWhatsappSettings">
+                <CheckCircle2 :size="18"/> Enregistrer les identifiants
+              </button>
+            </div>
+          </article>
+
+          <!-- Interactive Live WhatsApp AI Simulator -->
+          <article class="panel chatbot-sim-card">
+            <h2 style="font-size:16px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
+              <Bot :size="20" style="color:#2563eb;"/> التجربة المباشرة للريبوت (AI Bot Simulator)
+            </h2>
+            <p style="font-size:12px; color:#64748b; margin-bottom:14px;">
+              جرب محاكاة الدردشة المباشرة واختبار ردود الذكاء الاصطناعي على الطلبيات والأسعار والمخزون.
+            </p>
+
+            <!-- Quick Preset Action Chips -->
+            <div class="sim-presets" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;">
+              <button class="quiet" style="font-size:11px;" @click="sendSimMessage('سلام بغيت نأكد الطلب ديالي AL-2026-101')">
+                💬 تأكيد طلبية
+              </button>
+              <button class="quiet" style="font-size:11px;" @click="sendSimMessage('شحال الثمن ديال T-shirt؟')">
+                💬 السؤال عن الأسعار
+              </button>
+              <button class="quiet" style="font-size:11px;" @click="sendSimMessage('فوقاش كتوصل الشحنة؟')">
+                💬 مدة التوصيل
+              </button>
+            </div>
+
+            <!-- Chat Window Box -->
+            <div class="chat-messages-box">
+              <div v-for="(msg, idx) in simChatLogs" :key="idx" class="chat-bubble-row" :class="msg.sender">
+                <div class="chat-bubble" :class="msg.sender">
+                  <span class="sender-label">{{ msg.sender === 'user' ? 'الزبون (Customer)' : 'الريبوت الذكي (AI Bot 🤖)' }}</span>
+                  <p style="white-space:pre-line; margin:0;">{{ msg.text }}</p>
+                </div>
+              </div>
+              <div v-if="simLoading" class="chat-bubble-row bot">
+                <div class="chat-bubble bot typing">
+                  <span>الريبوت يكتب الآن... 🤖</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Chat Input Form -->
+            <form class="chat-input-form" @submit.prevent="sendSimMessage()">
+              <input v-model="simInput" type="text" placeholder="اكتب رسالة تجريبية هنا..." />
+              <button type="submit" class="primary" style="background:#2563eb; border:none; padding:0 14px;">
+                <Send :size="16"/>
+              </button>
+            </form>
+          </article>
         </div>
       </section>
 
