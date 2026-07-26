@@ -504,6 +504,52 @@ const navItems = {
 
 const nav = computed(() => navItems[shop.language] || navItems.fr)
 
+// --- Real Dynamic Dashboard Sales Performance Chart ---
+const chartPeriod = ref('7days') // '7days' | 'month'
+
+const salesPerformanceChart = computed(() => {
+  const result = []
+  const today = new Date()
+  const lang = shop.language || 'fr'
+
+  const frDays = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+  const arDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
+  const dayNames = lang === 'ar' ? arDays : frDays
+
+  const numDays = chartPeriod.value === 'month' ? 30 : 7
+  const validSales = (shop.sales || []).filter(s => s && !s.deleted && s.createdAt)
+
+  for (let i = numDays - 1; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    const dateStr = d.toISOString().slice(0, 10)
+
+    const salesOnDay = validSales.filter(s => {
+      const sDate = new Date(s.createdAt).toISOString().slice(0, 10)
+      return sDate === dateStr
+    })
+
+    const totalRev = salesOnDay.reduce((sum, s) => sum + (Number(s.total) || 0), 0)
+    const count = salesOnDay.length
+
+    result.push({
+      date: dateStr,
+      isToday: dateStr === today.toISOString().slice(0, 10),
+      label: chartPeriod.value === 'month' ? `${d.getDate()}/${d.getMonth()+1}` : dayNames[d.getDay()],
+      fullDate: d.toLocaleDateString(lang === 'ar' ? 'ar-MA' : 'fr-MA', { weekday: 'short', day: '2-digit', month: '2-digit' }),
+      revenue: totalRev,
+      salesCount: count
+    })
+  }
+
+  const maxRev = Math.max(...result.map(r => r.revenue), 100)
+
+  return result.map(r => ({
+    ...r,
+    heightPct: Math.max(10, Math.round((r.revenue / maxRev) * 100))
+  }))
+})
+
 // --- Daily Profit Reports State & Calculations ---
 const profitPreset = ref('month')
 const todayStr = new Date().toISOString().slice(0, 10)
@@ -1113,20 +1159,67 @@ onMounted(async () => {
           <button class="primary" @click="shop.active='pos'"><Plus :size="17"/> Nouvelle vente</button>
         </div>
         <div class="metrics">
-          <article><small>{{t.sales}}</small><strong>{{money(shop.todaySales||2840)}}</strong><em><ArrowUpRight :size="14"/> 12,5 %</em></article>
-          <article><small>{{t.month}}</small><strong>{{money(shop.monthSales||48720)}}</strong><em><ArrowUpRight :size="14"/> 8,2 %</em></article>
-          <article><small>{{t.profit}}</small><strong>{{money((shop.monthSales||48720)*.36)}}</strong><em><ArrowUpRight :size="14"/> 4,1 %</em></article>
-          <article><small>{{t.stock}}</small><strong>{{shop.lowStock.length}}</strong><em class="warning"><AlertTriangle :size="14"/> À traiter</em></article>
+          <article>
+            <small>{{t.sales}}</small>
+            <strong>{{money(shop.todaySales)}}</strong>
+            <em><ArrowUpRight :size="14"/> {{ shop.language === 'ar' ? 'تحديث حي' : 'En direct' }}</em>
+          </article>
+          <article>
+            <small>{{t.month}}</small>
+            <strong>{{money(shop.monthSales)}}</strong>
+            <em><ArrowUpRight :size="14"/> {{ shop.language === 'ar' ? 'هذا الشهر' : 'Ce mois-ci' }}</em>
+          </article>
+          <article>
+            <small>{{t.profit}}</small>
+            <strong :style="{ color: shop.netProfit >= 0 ? '#16a34a' : '#dc2626' }">{{money(shop.netProfit)}}</strong>
+            <em><ArrowUpRight :size="14"/> {{ shop.language === 'ar' ? 'الصافي الحقيقي' : 'Profit Net Réel' }}</em>
+          </article>
+          <article style="cursor:pointer;" @click="shop.active='products'">
+            <small>{{t.stock}}</small>
+            <strong>{{shop.lowStock.length}}</strong>
+            <em class="warning"><AlertTriangle :size="14"/> {{ shop.language === 'ar' ? 'منتج يتطلب التزود' : 'À réapprovisionner' }}</em>
+          </article>
         </div>
         <div class="dashboard-grid">
           <article class="panel chart">
             <div class="panel-title">
-              <div><h2>Performance des ventes</h2><p>7 derniers jours</p></div>
-              <button class="quiet">Cette semaine</button>
+              <div>
+                <h2>{{ shop.language === 'ar' ? 'أداء المبيعات الحقيقي' : 'Performance des ventes' }}</h2>
+                <p>{{ chartPeriod === 'month' ? (shop.language === 'ar' ? 'آخر 30 يوم' : '30 derniers jours') : (shop.language === 'ar' ? 'آخر 7 أيام' : '7 derniers jours') }}</p>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <button
+                  type="button"
+                  class="quiet"
+                  :style="chartPeriod === '7days' ? 'background:#09090b; color:#fff; border-color:#09090b;' : ''"
+                  @click="chartPeriod = '7days'"
+                >
+                  {{ shop.language === 'ar' ? '7 أيام' : '7 jours' }}
+                </button>
+                <button
+                  type="button"
+                  class="quiet"
+                  :style="chartPeriod === 'month' ? 'background:#09090b; color:#fff; border-color:#09090b;' : ''"
+                  @click="chartPeriod = 'month'"
+                >
+                  {{ shop.language === 'ar' ? '30 يوم' : '30 jours' }}
+                </button>
+              </div>
             </div>
             <div class="bars">
-              <i v-for="(h,i) in [45,71,54,83,62,91,76]" :key="i" :style="{height:h+'%'}">
-                <span>{{['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][i]}}</span>
+              <i
+                v-for="item in salesPerformanceChart"
+                :key="item.date"
+                :style="{ height: item.heightPct + '%' }"
+                :class="{ active: item.isToday, 'has-sales': item.revenue > 0 }"
+              >
+                <!-- Tooltip on Hover -->
+                <div class="bar-tooltip">
+                  <b>{{ item.fullDate }}</b>
+                  <span>{{ money(item.revenue) }}</span>
+                  <small>{{ item.salesCount }} {{ shop.language === 'ar' ? 'مبيعة' : 'vente(s)' }}</small>
+                </div>
+                <span>{{ item.label }}</span>
               </i>
             </div>
           </article>

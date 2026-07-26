@@ -520,28 +520,35 @@ h2 {
   height: 215px;
   display: flex;
   align-items: flex-end;
-  gap: 8%;
-  padding: 25px 10px 24px;
+  gap: 4%;
+  padding: 30px 10px 24px;
   border-bottom: 1px solid #ececea;
 }
 
 .bars i {
-  height: var(--h);
-  background: #151515;
-  border-radius: 5px 5px 0 0;
+  background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%);
+  border-radius: 6px 6px 0 0;
   flex: 1;
   position: relative;
-  min-width: 16px;
-  opacity: .92;
-  transition: opacity 0.15s ease;
+  min-width: 14px;
+  opacity: 0.85;
+  transition: height 0.35s ease, background 0.2s ease, opacity 0.2s ease;
+  cursor: pointer;
+}
+
+.bars i.has-sales {
+  background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+  opacity: 1;
+}
+
+.bars i.active {
+  background: linear-gradient(180deg, #10b981 0%, #047857 100%);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+  opacity: 1;
 }
 
 .bars i:hover {
   opacity: 1;
-}
-
-.bars i:nth-child(2n) {
-  background: #a7a7a2;
 }
 
 .bars span {
@@ -551,7 +558,42 @@ h2 {
   transform: translateX(-50%);
   font: 10px 'DM Mono';
   font-style: normal;
-  color: #777;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.bar-tooltip {
+  position: absolute;
+  top: -65px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.9);
+  background: #09090b;
+  color: #ffffff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.bar-tooltip span {
+  position: static;
+  color: #38bdf8;
+  font-weight: 800;
+  font-size: 12px;
+  transform: none;
+}
+
+.bars i:hover .bar-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
 }
 
 .list {
