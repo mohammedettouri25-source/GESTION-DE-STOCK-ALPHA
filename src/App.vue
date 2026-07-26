@@ -637,6 +637,25 @@ const activeWaConv = computed(() => {
 const inboxInput = ref('')
 const inboxSending = ref(false)
 
+function simulateIncomingWhatsappMessage(customPhone = '0641432859', customText = 'سلام خويا، بغيت نأكد الطلبية ديالي AL-2026-101') {
+  let conv = waConversations.value.find(c => c.phone.includes(customPhone))
+  if (!conv) {
+    conv = {
+      id: 'conv-' + Date.now(),
+      customerName: 'الزبون (0641432859)',
+      phone: customPhone,
+      orderNumber: 'AL-2026-101',
+      unreadCount: 1,
+      lastTime: 'À l\'instant',
+      messages: []
+    }
+    waConversations.value.unshift(conv)
+  }
+  activeWaConvId.value = conv.id
+  waSubTab.value = 'inbox'
+  sendInboxMessage(customText)
+}
+
 async function sendInboxMessage(customText = null) {
   const conv = activeWaConv.value
   if (!conv) return
@@ -2178,6 +2197,15 @@ onMounted(async () => {
                   <label>Phone Number ID (Meta)</label>
                   <input v-model="whatsappSettings.phoneId" type="text" placeholder="1029384..." />
                 </div>
+              </div>
+
+              <div style="margin-top:14px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px;">
+                <p style="font-size:12px; color:#1e40af; margin:0 0 8px; font-weight:600;">
+                  📱 رقم الهاتف المسجل: 212641432859 (جاهز ومفعل فـ السيستيم 🟢)
+                </p>
+                <button type="button" class="quiet" style="font-size:11px; background:#ffffff; color:#2563eb; width:100%; text-align:center;" @click="simulateIncomingWhatsappMessage('0641432859', 'سلام خويا، بغيت نأكد الطلبية ديالي AL-2026-101')">
+                  ⚡ تجربة وصول رسالة واتساب حية من الزبون (0641432859) 💬
+                </button>
               </div>
 
               <button class="primary" style="margin-top:16px; width:100%; background:#16a34a; border:none;" @click="saveWhatsappSettings">
