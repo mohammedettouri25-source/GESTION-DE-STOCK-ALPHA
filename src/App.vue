@@ -1206,21 +1206,23 @@ onMounted(async () => {
                 </button>
               </div>
             </div>
-            <div class="bars">
-              <i
-                v-for="item in salesPerformanceChart"
-                :key="item.date"
-                :style="{ height: item.heightPct + '%' }"
-                :class="{ active: item.isToday, 'has-sales': item.revenue > 0 }"
-              >
-                <!-- Tooltip on Hover -->
-                <div class="bar-tooltip">
-                  <b>{{ item.fullDate }}</b>
-                  <span>{{ money(item.revenue) }}</span>
-                  <small>{{ item.salesCount }} {{ shop.language === 'ar' ? 'مبيعة' : 'vente(s)' }}</small>
-                </div>
-                <span>{{ item.label }}</span>
-              </i>
+            <div class="chart-scroll-wrapper">
+              <div class="bars" :class="{ 'mode-month': chartPeriod === 'month' }">
+                <i
+                  v-for="(item, idx) in salesPerformanceChart"
+                  :key="item.date"
+                  :style="{ height: item.heightPct + '%' }"
+                  :class="{ active: item.isToday, 'has-sales': item.revenue > 0 }"
+                >
+                  <!-- Tooltip on Hover -->
+                  <div class="bar-tooltip">
+                    <b>{{ item.fullDate }}</b>
+                    <span>{{ money(item.revenue) }}</span>
+                    <small>{{ item.salesCount }} {{ shop.language === 'ar' ? 'مبيعة' : 'vente(s)' }}</small>
+                  </div>
+                  <span v-if="chartPeriod === '7days' || idx % 3 === 0 || item.isToday">{{ item.label }}</span>
+                </i>
+              </div>
             </div>
           </article>
           <article class="panel">

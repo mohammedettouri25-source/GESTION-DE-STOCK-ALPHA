@@ -516,13 +516,32 @@ h2 {
   min-height: 310px;
 }
 
+.chart-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 6px;
+}
+
 .bars {
   height: 215px;
   display: flex;
   align-items: flex-end;
-  gap: 4%;
+  gap: 3%;
   padding: 30px 10px 24px;
   border-bottom: 1px solid #ececea;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bars.mode-month {
+  min-width: 680px;
+  gap: 6px;
+}
+
+.bars.mode-month i {
+  min-width: 10px;
+  border-radius: 4px 4px 0 0;
 }
 
 .bars i {
