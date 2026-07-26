@@ -1233,6 +1233,22 @@ async function executePaySupplierDebt() {
   paySupplierModal.value = null
 }
 
+// Customer Credit/Debt Settlement Modal State & Methods
+const payCustomerModal = ref(null)
+const payCustomerAmount = ref(0)
+
+function openPayCustomerDebt(customer) {
+  payCustomerModal.value = customer
+  const owed = Math.max(0, (Number(customer.totalPurchases) || 0) - (Number(customer.totalPaid) || 0))
+  payCustomerAmount.value = owed
+}
+
+async function executePayCustomerDebt() {
+  if (!payCustomerModal.value) return
+  await shop.payCustomerCredit(payCustomerModal.value.id, payCustomerAmount.value)
+  payCustomerModal.value = null
+}
+
 async function saveEntry() {
   if (entryModal.value === 'customer') {
     if (!entry.value.name) return shop.notify('Nom du client requis')
@@ -1754,6 +1770,15 @@ onMounted(async () => {
           </article>
         </div>
 
+        <!-- Header Debt Metric Card for Customers -->
+        <div v-if="shop.active === 'customers'" class="metrics" style="margin-bottom: 20px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
+          <article class="profit-card highlight">
+            <small>Total Crédit Clients (كاندسالوهوم / شحال بقينا نتسالو)</small>
+            <strong class="text-orange" style="font-size: 22px;">{{ money(shop.totalCustomerDebt) }}</strong>
+            <em>Montant total restant à encaisser auprès des clients</em>
+          </article>
+        </div>
+
         <div class="panel directory">
           <div v-if="(shop.active==='customers' ? (shop.customers || []) : (shop.suppliers || [])).length" class="table">
             <div v-for="person in (shop.active==='customers' ? (shop.customers || []) : (shop.suppliers || []))" :key="person.id || person.name">
@@ -1786,12 +1811,35 @@ onMounted(async () => {
                 </div>
               </template>
               <template v-else>
-                <strong>{{person.address || person.email || '—'}}</strong>
+                <div style="display:flex; flex-direction:column; gap:2px; font-size:12px;">
+                  <span v-if="Number(person.totalPurchases || 0) > 0">Crédit total: <b style="color:#dc2626;">{{money(person.totalPurchases || 0)}}</b></span>
+                  <span v-if="Number(person.totalPaid || 0) > 0" style="color:#16a34a;">Montant Payé: {{money(person.totalPaid || 0)}}</span>
+                  <span v-if="!Number(person.totalPurchases || 0)">{{person.address || person.city || '—'}}</span>
+                </div>
+                <div v-if="Number(person.totalPurchases || 0) > 0">
+                  <span
+                    v-if="(Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) > 0"
+                    class="credit-warning-badge danger"
+                    style="display:inline-block; font-size:11px; padding:4px 8px;"
+                  >
+                    🔴 Crédit: {{ money(Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) }} (كاندسالوه)
+                  </span>
+                  <span
+                    v-else
+                    class="credit-warning-badge success"
+                    style="display:inline-block; font-size:11px; padding:4px 8px;"
+                  >
+                    🟢 Soldé (تخالص)
+                  </span>
+                </div>
               </template>
 
               <div style="display:flex; gap:6px; align-items:center;">
                 <button v-if="shop.active === 'suppliers' && (Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) > 0" class="quiet" style="color:#d97706; font-weight:600; font-size:12px; border:1px solid #fef08a; background:#fefce8; padding:4px 8px; border-radius:6px;" @click.stop="openPaySupplierDebt(person)" title="Régler la dette fournisseur">
                   💰 Régler
+                </button>
+                <button v-if="shop.active === 'customers' && (Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) > 0" class="quiet" style="color:#d97706; font-weight:600; font-size:12px; border:1px solid #fef08a; background:#fefce8; padding:4px 8px; border-radius:6px;" @click.stop="openPayCustomerDebt(person)" title="Encaisser le crédit client">
+                  💰 Encaisser
                 </button>
                 <button v-if="person.phone" class="icon" style="color:#16a34a;" title="Contacter sur WhatsApp" @click.stop="sendWhatsAppCustomerMessage(person)">
                   <MessageCircle :size="16"/>
@@ -3021,6 +3069,40 @@ onMounted(async () => {
           <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
             <button type="button" class="quiet" @click="paySupplierModal = null">Annuler</button>
             <button type="submit" class="primary" style="background:#16a34a; border-color:#16a34a;">Confirmer le règlement ✓</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Customer Credit Payment Modal -->
+    <div v-if="payCustomerModal" class="overlay" @click.self="payCustomerModal = null">
+      <div class="modal card" style="max-width: 480px; width: 100%; padding: 24px; background: #fff; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+        <div class="modal-head" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <p class="eyebrow" style="color:#d97706;">ENCAISSEMENT CRÉDIT CLIENT (تحصيل الدين)</p>
+            <h2 style="margin: 0; font-size: 18px;">Client: {{ payCustomerModal.name }}</h2>
+          </div>
+          <button type="button" class="icon" @click="payCustomerModal = null"><X :size="18"/></button>
+        </div>
+        <form @submit.prevent="executePayCustomerDebt">
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px; margin-bottom:16px; font-size:13px; color:#991b1b;">
+            Crédit restant : <b>{{ money(Number(payCustomerModal.totalPurchases || 0) - Number(payCustomerModal.totalPaid || 0)) }}</b> (كاندسالوه)
+          </div>
+          <div v-if="payCustomerModal.creditHistory && payCustomerModal.creditHistory.length" style="margin-bottom:16px; max-height:150px; overflow-y:auto; font-size:12px; background:#f9fafb; border-radius:8px; padding:10px; border:1px solid #e5e7eb;">
+            <div style="font-weight:600; margin-bottom:6px; color:#374151;">📋 Historique du crédit :</div>
+            <div v-for="(h, i) in payCustomerModal.creditHistory" :key="i" style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid #f3f4f6;">
+              <span>{{ h.saleNumber }}</span>
+              <span :style="{ color: h.amount > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }">{{ h.amount > 0 ? '+' : '' }}{{ money(h.amount) }}</span>
+              <span style="color:#9ca3af;">{{ new Date(h.date).toLocaleDateString('fr-MA') }}</span>
+            </div>
+          </div>
+          <label style="display:block; margin-bottom:16px;">
+            <span style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Montant encaissé (MAD)</span>
+            <input v-model.number="payCustomerAmount" type="number" min="1" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ddd; font-weight: 700; font-size: 16px; color:#16a34a;"/>
+          </label>
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+            <button type="button" class="quiet" @click="payCustomerModal = null">Annuler</button>
+            <button type="submit" class="primary" style="background:#16a34a; border-color:#16a34a;">Confirmer l'encaissement ✓</button>
           </div>
         </form>
       </div>

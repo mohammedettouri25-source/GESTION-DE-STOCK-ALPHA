@@ -245,6 +245,10 @@ export const useShop = defineStore('shop', {
         // Bug fix: unique sale number using timestamp to avoid collisions across browsers
         const saleNum = `V-${Date.now().toString(36).toUpperCase()}-${String(this.sales.length + 1).padStart(4, '0')}`
 
+        const saleTotal = Math.max(0, this.cartTotal - discount + shipping)
+        const paidAmount = Number(details.paidAmount) || saleTotal
+        const remainingBalance = Math.max(0, saleTotal - paidAmount)
+
         const sale = {
           id: crypto.randomUUID(),
           number: saleNum,
@@ -255,7 +259,9 @@ export const useShop = defineStore('shop', {
           subtotal: this.cartTotal,
           discount,
           shipping,
-          total: Math.max(0, this.cartTotal - discount + shipping),
+          total: saleTotal,
+          paidAmount,
+          remainingBalance,
           customer: details.customer ? { ...details.customer } : null,
           payment,
           status: 'completed'
@@ -291,6 +297,12 @@ export const useShop = defineStore('shop', {
         this.sales.unshift(sale)
         this.cart = []
         await this.queue('sales', sale)
+
+        // Update customer credit/debt when there is a remaining balance
+        if (remainingBalance > 0 && sale.customer && sale.customer.name) {
+          await this.updateCustomerCredit(sale.customer, remainingBalance, sale.number)
+        }
+
         this.notify(`Vente ${sale.number} finalisée ✓`)
         return sale
       } catch (error) {
@@ -647,6 +659,89 @@ export const useShop = defineStore('shop', {
       } catch (err) {
         this.notify(`Erreur : ${err.message}`)
       }
+    },
+
+    // Update customer credit/debt when a sale has remaining balance
+    async updateCustomerCredit(saleCustomer, creditAmount, saleNumber) {
+      try {
+        // Find or create customer by phone or name
+        const phone = (saleCustomer.phone || '').trim()
+        const name = (saleCustomer.name || '').trim()
+        if (!name && !phone) return
+
+        let existing = this.customers.find(c =>
+          (phone && c.phone === phone) || (name && c.name === name)
+        )
+
+        if (existing) {
+          // Accumulate credit on existing customer
+          const updated = {
+            ...existing,
+            totalPurchases: (Number(existing.totalPurchases) || 0) + creditAmount,
+            creditHistory: [
+              ...(existing.creditHistory || []),
+              { saleNumber, amount: creditAmount, date: new Date().toISOString() }
+            ]
+          }
+          await localDb.customers.put(updated)
+          const idx = this.customers.findIndex(x => x.id === updated.id)
+          if (idx >= 0) this.customers.splice(idx, 1, updated)
+          await this.queue('customers', updated)
+        } else {
+          // Auto-create customer with initial credit
+          const newCustomer = {
+            id: crypto.randomUUID(),
+            name,
+            phone,
+            city: saleCustomer.city || '',
+            address: saleCustomer.address || '',
+            totalPurchases: creditAmount,
+            totalPaid: 0,
+            creditHistory: [
+              { saleNumber, amount: creditAmount, date: new Date().toISOString() }
+            ],
+            createdAt: new Date().toISOString()
+          }
+          await localDb.customers.put(newCustomer)
+          this.customers.unshift(newCustomer)
+          await this.queue('customers', newCustomer)
+        }
+      } catch (err) {
+        console.error('updateCustomerCredit error:', err)
+      }
+    },
+
+    // Pay off some or all of a customer's credit balance
+    async payCustomerCredit(customerId, paymentAmount) {
+      try {
+        const idx = this.customers.findIndex(x => x.id === customerId)
+        if (idx < 0) return this.notify('Client introuvable')
+        const customer = this.customers[idx]
+        const currentDebt = Math.max(0, (Number(customer.totalPurchases) || 0) - (Number(customer.totalPaid) || 0))
+        const payment = Math.min(paymentAmount, currentDebt)
+
+        const updated = {
+          ...customer,
+          totalPaid: (Number(customer.totalPaid) || 0) + payment,
+          creditHistory: [
+            ...(customer.creditHistory || []),
+            { saleNumber: 'PAIEMENT', amount: -payment, date: new Date().toISOString() }
+          ]
+        }
+        await localDb.customers.put(updated)
+        this.customers.splice(idx, 1, updated)
+        await this.queue('customers', updated)
+        this.notify(`Paiement de ${payment} MAD enregistré ✓`)
+      } catch (err) {
+        this.notify(`Erreur : ${err.message}`)
+      }
+    },
+
+    // Compute total customer debt across all customers
+    get totalCustomerDebt() {
+      return this.customers.reduce((sum, c) => {
+        return sum + Math.max(0, (Number(c.totalPurchases) || 0) - (Number(c.totalPaid) || 0))
+      }, 0)
     },
 
     async saveSupplier(supplier) {
