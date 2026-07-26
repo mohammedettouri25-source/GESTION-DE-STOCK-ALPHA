@@ -2169,4 +2169,182 @@ h2 {
   }
 }
 
+/* ==========================================================================
+   Comprehensive Mobile Responsiveness & Phone Optimization
+   ========================================================================== */
+
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr !important;
+  }
+  
+  main {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding: 16px 12px 100px !important;
+  }
+
+  .page-head {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .page-head button,
+  .page-head .primary {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Toolbar Filters for Profits and Finance */
+  .profit-filter-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 14px !important;
+    padding: 14px !important;
+  }
+
+  .preset-buttons {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+
+  .preset-btn {
+    flex: 1 1 auto !important;
+    text-align: center !important;
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+  }
+
+  .date-pickers {
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 10px !important;
+  }
+
+  .date-pickers label {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  .date-pickers input {
+    flex: 1 !important;
+    max-width: 180px !important;
+  }
+
+  /* Metric Cards Grid Stacking */
+  .metrics,
+  .profit-metrics,
+  .finance-metrics {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+
+  .profit-card,
+  .metrics article {
+    padding: 12px !important;
+  }
+
+  .profit-card strong,
+  .metrics article strong {
+    font-size: 18px !important;
+  }
+
+  /* Daily Profits Report Table Horizontal Scroll & Responsive Container */
+  .profit-table-panel,
+  .top-products-panel {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .profit-table,
+  .top-products-table {
+    min-width: 760px !important;
+  }
+
+  .profit-detail-drawer {
+    padding: 12px 10px !important;
+    overflow-x: auto !important;
+  }
+
+  .detail-products-table {
+    min-width: 580px !important;
+  }
+
+  /* Orders, Products, Customers, Suppliers Tables Mobile Scroll */
+  .orders-list .table,
+  .panel .table {
+    overflow-x: auto !important;
+  }
+
+  /* Modal Form Responsiveness */
+  .overlay {
+    padding: 12px !important;
+    align-items: flex-end !important;
+  }
+
+  .modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    padding: 16px 14px !important;
+  }
+
+  .two {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .sale-type-buttons {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* POS Catalog & POS View on Mobile */
+  .pos-layout {
+    flex-direction: column !important;
+  }
+
+  .pos-layout .catalog {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  .pos-layout .cart {
+    display: none !important; /* Mobile uses floating cart sheet */
+  }
+
+  .mobile-cart-float {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .metrics,
+  .profit-metrics,
+  .finance-metrics {
+    grid-template-columns: 1fr !important;
+  }
+  
+  header {
+    padding: 10px 12px !important;
+  }
+
+  .header-actions {
+    gap: 6px !important;
+  }
+
+  h1 {
+    font-size: 20px !important;
+  }
+}
+
 
