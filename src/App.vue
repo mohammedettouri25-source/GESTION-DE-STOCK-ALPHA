@@ -550,6 +550,45 @@ const salesPerformanceChart = computed(() => {
   }))
 })
 
+// Touch & Mouse Drag Scrolling for Chart
+const chartScrollRef = ref(null)
+let isDraggingChart = false
+let startXChart = 0
+let scrollLeftChart = 0
+
+function startDragChart(e) {
+  isDraggingChart = true
+  startXChart = e.pageX - (chartScrollRef.value?.offsetLeft || 0)
+  scrollLeftChart = chartScrollRef.value?.scrollLeft || 0
+}
+
+function onDragChart(e) {
+  if (!isDraggingChart || !chartScrollRef.value) return
+  const x = e.pageX - (chartScrollRef.value.offsetLeft || 0)
+  const walk = (x - startXChart) * 2
+  chartScrollRef.value.scrollLeft = scrollLeftChart - walk
+}
+
+function endDragChart() {
+  isDraggingChart = false
+}
+
+let touchStartX = 0
+let touchScrollLeft = 0
+
+function onTouchStartChart(e) {
+  if (!chartScrollRef.value || !e.touches || !e.touches[0]) return
+  touchStartX = e.touches[0].pageX
+  touchScrollLeft = chartScrollRef.value.scrollLeft
+}
+
+function onTouchMoveChart(e) {
+  if (!chartScrollRef.value || !e.touches || !e.touches[0]) return
+  const x = e.touches[0].pageX
+  const walk = (x - touchStartX) * 1.8
+  chartScrollRef.value.scrollLeft = touchScrollLeft - walk
+}
+
 // --- Daily Profit Reports State & Calculations ---
 const profitPreset = ref('month')
 const todayStr = new Date().toISOString().slice(0, 10)
@@ -1206,7 +1245,16 @@ onMounted(async () => {
                 </button>
               </div>
             </div>
-            <div class="chart-scroll-wrapper">
+            <div
+              ref="chartScrollRef"
+              class="chart-scroll-wrapper"
+              @mousedown="startDragChart"
+              @mousemove="onDragChart"
+              @mouseleave="endDragChart"
+              @mouseup="endDragChart"
+              @touchstart="onTouchStartChart"
+              @touchmove="onTouchMoveChart"
+            >
               <div class="bars" :class="{ 'mode-month': chartPeriod === 'month' }">
                 <i
                   v-for="(item, idx) in salesPerformanceChart"
@@ -1224,6 +1272,9 @@ onMounted(async () => {
                 </i>
               </div>
             </div>
+            <small v-if="chartPeriod === 'month'" class="chart-scroll-hint">
+              👈 {{ shop.language === 'ar' ? 'إسحب الأفقي لرؤية الـ 30 يوماً كاملة' : 'Glissez horizontalement pour voir les 30 jours' }} 👉
+            </small>
           </article>
           <article class="panel">
             <div class="panel-title">
