@@ -40,7 +40,12 @@ export const useShop = defineStore('shop', {
     grossProfit: s => s.totalSales - s.totalCOGS,
     netProfit: s => s.grossProfit - s.totalExpenses,
     profitMargin: s => s.totalSales ? ((s.netProfit / s.totalSales) * 100).toFixed(1) : 0,
-    cartTotal: s => (s.cart || []).reduce((n, x) => n + (Number(x.price) || 0) * (Number(x.quantity) || 0), 0)
+    cartTotal: s => (s.cart || []).reduce((n, x) => n + (Number(x.price) || 0) * (Number(x.quantity) || 0), 0),
+    totalSupplierDebt: s => (s.suppliers || []).reduce((sum, sup) => {
+      const purchases = Number(sup.totalPurchases) || 0
+      const paid = Number(sup.totalPaid) || 0
+      return sum + Math.max(0, purchases - paid)
+    }, 0)
   },
 
   actions: {
@@ -629,6 +634,10 @@ export const useShop = defineStore('shop', {
 
     async saveSupplier(supplier) {
       try {
+        const totalPurchases = Math.max(0, Number(supplier.totalPurchases) || 0)
+        const totalPaid = Math.max(0, Number(supplier.totalPaid) || 0)
+        const balanceOwed = Math.max(0, totalPurchases - totalPaid)
+
         const s = {
           ...supplier,
           id: supplier.id || crypto.randomUUID(),
@@ -636,6 +645,9 @@ export const useShop = defineStore('shop', {
           phone: supplier.phone || '',
           company: supplier.company || '',
           email: supplier.email || '',
+          totalPurchases,
+          totalPaid,
+          balanceOwed,
           createdAt: supplier.createdAt || new Date().toISOString()
         }
         await localDb.suppliers?.put(s).catch(() => {})
@@ -644,6 +656,36 @@ export const useShop = defineStore('shop', {
         else this.suppliers.splice(idx, 1, s)
         await this.queue('suppliers', s)
         this.notify('Fournisseur enregistré ✓')
+      } catch (err) {
+        this.notify(`Erreur : ${err.message}`)
+      }
+    },
+
+    async paySupplierDebt(supplierId, paymentAmount, createExpense = true) {
+      try {
+        const idx = this.suppliers.findIndex(x => x.id === supplierId)
+        if (idx < 0) return
+        const amount = Math.max(0, Number(paymentAmount) || 0)
+        if (amount <= 0) return this.notify('Veuillez entrer un montant valide')
+
+        const s = JSON.parse(JSON.stringify(this.suppliers[idx]))
+        s.totalPaid = (Number(s.totalPaid) || 0) + amount
+        s.balanceOwed = Math.max(0, (Number(s.totalPurchases) || 0) - s.totalPaid)
+
+        await localDb.suppliers?.put(s).catch(() => {})
+        this.suppliers.splice(idx, 1, s)
+        await this.queue('suppliers', s)
+
+        if (createExpense) {
+          await this.saveExpense({
+            category: 'Achat de Stock',
+            amount,
+            note: `Règlement dette fournisseur: ${s.name} (${s.company || 'Direct'})`,
+            date: new Date().toISOString().slice(0, 10)
+          })
+        }
+
+        this.notify(`Règlement de ${amount} MAD enregistré pour ${s.name} ✓`)
       } catch (err) {
         this.notify(`Erreur : ${err.message}`)
       }

@@ -738,8 +738,88 @@ function addEntry(type) {
   entry.value = type === 'customer'
     ? { name: '', phone: '', city: '', address: '' }
     : type === 'supplier'
-      ? { name: '', phone: '', company: '', email: '' }
+      ? { name: '', phone: '', company: '', email: '', totalPurchases: 0, totalPaid: 0 }
       : { category: 'Loyer (Rent)', amount: 0, note: '', date: new Date().toISOString().slice(0, 10) }
+}
+
+function editEntry(type, item) {
+  entryModal.value = type
+  entry.value = JSON.parse(JSON.stringify(item))
+}
+
+// Finance Date Range Filter State
+const financePreset = ref('month')
+const financeStartDate = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10))
+const financeEndDate = ref(new Date().toISOString().slice(0, 10))
+
+function setFinancePreset(preset) {
+  financePreset.value = preset
+  const today = new Date()
+  if (preset === 'today') {
+    financeStartDate.value = today.toISOString().slice(0, 10)
+    financeEndDate.value = today.toISOString().slice(0, 10)
+  } else if (preset === 'week') {
+    const past = new Date()
+    past.setDate(past.getDate() - 7)
+    financeStartDate.value = past.toISOString().slice(0, 10)
+    financeEndDate.value = today.toISOString().slice(0, 10)
+  } else if (preset === 'month') {
+    financeStartDate.value = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10)
+    financeEndDate.value = today.toISOString().slice(0, 10)
+  } else if (preset === 'all') {
+    financeStartDate.value = ''
+    financeEndDate.value = ''
+  }
+}
+
+const filteredFinanceSales = computed(() => {
+  return (shop.sales || []).filter(sale => {
+    if (!sale || sale.deleted || !sale.createdAt) return false
+    const d = new Date(sale.createdAt).toISOString().slice(0, 10)
+    if (financeStartDate.value && d < financeStartDate.value) return false
+    if (financeEndDate.value && d > financeEndDate.value) return false
+    return true
+  })
+})
+
+const filteredFinanceExpenses = computed(() => {
+  return (shop.expenses || []).filter(e => {
+    if (!e || e.deleted) return false
+    const d = e.date || (e.createdAt ? new Date(e.createdAt).toISOString().slice(0, 10) : '')
+    if (financeStartDate.value && d < financeStartDate.value) return false
+    if (financeEndDate.value && d > financeEndDate.value) return false
+    return true
+  }).sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))
+})
+
+const filteredFinanceSalesTotal = computed(() => {
+  return filteredFinanceSales.value.reduce((sum, s) => sum + (Number(s.total) || 0), 0)
+})
+
+const filteredFinanceExpensesTotal = computed(() => {
+  return filteredFinanceExpenses.value.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+})
+
+const filteredFinanceNet = computed(() => {
+  return filteredFinanceSalesTotal.value - filteredFinanceExpensesTotal.value
+})
+
+// Supplier Debt Settlement Modal State & Methods
+const paySupplierModal = ref(null)
+const paySupplierAmount = ref(0)
+const paySupplierAddExpense = ref(true)
+
+function openPaySupplierDebt(supplier) {
+  paySupplierModal.value = supplier
+  const owed = Math.max(0, (Number(supplier.totalPurchases) || 0) - (Number(supplier.totalPaid) || 0))
+  paySupplierAmount.value = owed
+  paySupplierAddExpense.value = true
+}
+
+async function executePaySupplierDebt() {
+  if (!paySupplierModal.value) return
+  await shop.paySupplierDebt(paySupplierModal.value.id, paySupplierAmount.value, paySupplierAddExpense.value)
+  paySupplierModal.value = null
 }
 
 async function saveEntry() {
@@ -1177,17 +1257,60 @@ onMounted(async () => {
           <div><p class="eyebrow">RÉPERTOIRE</p><h1>{{shop.active==='customers'?'Clients':'Fournisseurs'}}</h1></div>
           <button class="primary" @click="addEntry(shop.active==='customers'?'customer':'supplier')"><Plus :size="17"/> Ajouter {{shop.active==='customers'?'un client':'un fournisseur'}}</button>
         </div>
+
+        <!-- Header Debt Metric Card for Suppliers -->
+        <div v-if="shop.active === 'suppliers'" class="metrics" style="margin-bottom: 20px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
+          <article class="profit-card highlight">
+            <small>Total Dettes Fournisseurs (ديون الموردين / شحال كايسالونا)</small>
+            <strong class="text-orange" style="font-size: 22px;">{{ money(shop.totalSupplierDebt) }}</strong>
+            <em>Montant total restant à régler aux fournisseurs de stock</em>
+          </article>
+        </div>
+
         <div class="panel directory">
           <div v-if="(shop.active==='customers' ? (shop.customers || []) : (shop.suppliers || [])).length" class="table">
             <div v-for="person in (shop.active==='customers' ? (shop.customers || []) : (shop.suppliers || []))" :key="person.id || person.name">
-              <span><b>{{person.name}}</b><small>{{person.phone||person.email||'Aucun contact'}}</small></span>
-              <span>{{person.city||person.company||'—'}}</span>
-              <strong>{{person.address||person.email||'—'}}</strong>
+              <span>
+                <b>{{person.name}}</b>
+                <small>{{person.phone || person.email || 'Aucun contact'}}</small>
+              </span>
+              <span>{{person.company || person.city || '—'}}</span>
+              
+              <template v-if="shop.active === 'suppliers'">
+                <div style="display:flex; flex-direction:column; gap:2px; font-size:12px;">
+                  <span>Achats Stock: <b>{{money(person.totalPurchases || 0)}}</b></span>
+                  <span style="color:#16a34a;">Montant Payé: {{money(person.totalPaid || 0)}}</span>
+                </div>
+                <div>
+                  <span
+                    v-if="(Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) > 0"
+                    class="credit-warning-badge danger"
+                    style="display:inline-block; font-size:11px; padding:4px 8px;"
+                  >
+                    🔴 Dette: {{ money(Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) }} (كايسالونا)
+                  </span>
+                  <span
+                    v-else
+                    class="credit-warning-badge success"
+                    style="display:inline-block; font-size:11px; padding:4px 8px;"
+                  >
+                    🟢 Solde Réglé (100%)
+                  </span>
+                </div>
+              </template>
+              <template v-else>
+                <strong>{{person.address || person.email || '—'}}</strong>
+              </template>
+
               <div style="display:flex; gap:6px; align-items:center;">
+                <button v-if="shop.active === 'suppliers' && (Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) > 0" class="quiet" style="color:#d97706; font-weight:600; font-size:12px; border:1px solid #fef08a; background:#fefce8; padding:4px 8px; border-radius:6px;" @click.stop="openPaySupplierDebt(person)" title="Régler la dette fournisseur">
+                  💰 Régler
+                </button>
                 <button v-if="person.phone" class="icon" style="color:#16a34a;" title="Contacter sur WhatsApp" @click.stop="sendWhatsAppCustomerMessage(person)">
                   <MessageCircle :size="16"/>
                 </button>
-                <button class="icon" style="color:#dc2626" @click.stop="deleteEntry(shop.active==='customers'?'customer':'supplier', person.id)"><Trash2 :size="15"/></button>
+                <button class="icon" style="color:#2563eb" title="Modifier" @click.stop="editEntry(shop.active==='customers'?'customer':'supplier', person)"><MoreHorizontal :size="15"/></button>
+                <button class="icon" style="color:#dc2626" title="Supprimer" @click.stop="deleteEntry(shop.active==='customers'?'customer':'supplier', person.id)"><Trash2 :size="15"/></button>
               </div>
             </div>
           </div>
@@ -1198,28 +1321,51 @@ onMounted(async () => {
       <!-- Finance View -->
       <section v-else-if="shop.active==='finance'" class="page">
         <div class="page-head">
-          <div><p class="eyebrow">TRÉSORERIE & DÉPENSES</p><h1>Finance</h1></div>
+          <div><p class="eyebrow">TRÉSORERIE & DÉPENSES</p><h1>Finance & Trésorerie</h1></div>
           <button class="primary" @click="addEntry('expense')"><Plus :size="17"/> Ajouter une dépense</button>
         </div>
-        <div class="metrics finance-metrics">
-          <article><small>Ventes Totales (Encaissements)</small><strong>{{money(shop.totalSales)}}</strong></article>
-          <article><small>Total Dépenses</small><strong style="color: #dc2626;">{{money(shop.totalExpenses)}}</strong></article>
-          <article><small>Solde Net (Profit)</small><strong :style="{ color: shop.netProfit >= 0 ? '#16a34a' : '#dc2626' }">{{money(shop.netProfit)}}</strong></article>
-          <article><small>Valeur du Stock</small><strong>{{money(shop.inventoryValue)}}</strong></article>
+
+        <!-- Date Range Filter Toolbar for Finance -->
+        <div class="panel profit-filter-toolbar" style="margin-bottom: 20px;">
+          <div class="preset-buttons">
+            <span class="eyebrow" style="margin-right: 8px;">PÉRIODE :</span>
+            <button type="button" class="preset-btn" :class="{ active: financePreset === 'today' }" @click="setFinancePreset('today')">Aujourd'hui</button>
+            <button type="button" class="preset-btn" :class="{ active: financePreset === 'week' }" @click="setFinancePreset('week')">7 Derniers Jours</button>
+            <button type="button" class="preset-btn" :class="{ active: financePreset === 'month' }" @click="setFinancePreset('month')">Ce Mois-ci</button>
+            <button type="button" class="preset-btn" :class="{ active: financePreset === 'all' }" @click="setFinancePreset('all')">Tout</button>
+          </div>
+          <div class="date-pickers">
+            <label>
+              <span>Date Début:</span>
+              <input type="date" v-model="financeStartDate" @change="financePreset = 'custom'" />
+            </label>
+            <label>
+              <span>Date Fin:</span>
+              <input type="date" v-model="financeEndDate" @change="financePreset = 'custom'" />
+            </label>
+          </div>
         </div>
+
+        <div class="metrics finance-metrics">
+          <article><small>Ventes Totales (Encaissements)</small><strong class="text-blue">{{money(filteredFinanceSalesTotal)}}</strong><em>{{filteredFinanceSales.length}} vente(s) sur la période</em></article>
+          <article><small>Total Dépenses</small><strong style="color: #dc2626;">{{money(filteredFinanceExpensesTotal)}}</strong><em>{{filteredFinanceExpenses.length}} dépense(s) enregistrée(s)</em></article>
+          <article><small>Solde Net (Cashflow Net)</small><strong :style="{ color: filteredFinanceNet >= 0 ? '#16a34a' : '#dc2626' }">{{money(filteredFinanceNet)}}</strong><em>Recettes - Dépenses du filtre</em></article>
+          <article style="cursor:pointer;" @click="shop.active='suppliers'"><small>Dettes Fournisseurs (كايسالونا)</small><strong style="color: #ea580c;">{{money(shop.totalSupplierDebt)}}</strong><em style="color:#2563eb; text-decoration:underline;">Voir le détail des fournisseurs →</em></article>
+        </div>
+
         <div class="panel">
           <div class="panel-title">
-            <div><h2>Journal des Dépenses</h2><p>Loyer, salaires, électricité, publicité, livraison...</p></div>
+            <div><h2>Journal des Dépenses</h2><p>Loyer, salaires, électricité, publicité, livraison, achats stock...</p></div>
           </div>
-          <div v-if="(shop.expenses || []).length" class="table">
-            <div v-for="expense in (shop.expenses || [])" :key="expense.id || expense.category">
+          <div v-if="filteredFinanceExpenses.length" class="table">
+            <div v-for="expense in filteredFinanceExpenses" :key="expense.id || expense.category">
               <span><b>{{expense.category}}</b><small>{{expense.date}}</small></span>
               <span>{{expense.note||'—'}}</span>
               <strong style="color: #dc2626;">-{{money(expense.amount)}}</strong>
               <button class="icon" style="color:#dc2626" @click.stop="deleteEntry('expense', expense.id)"><Trash2 :size="15"/></button>
             </div>
           </div>
-          <div v-else class="empty">Aucune dépense enregistrée. Cliquez sur "Ajouter une dépense".</div>
+          <div v-else class="empty">Aucune dépense trouvée pour cette période.</div>
         </div>
       </section>
 
@@ -1802,12 +1948,23 @@ onMounted(async () => {
           <label>Adresse<input v-model="entry.address"/></label>
         </template>
         <template v-else-if="entryModal==='supplier'">
-          <label>Nom<input v-model="entry.name" required/></label>
+          <label>Nom du fournisseur<input v-model="entry.name" required placeholder="Ex: Grossiste Hassan"/></label>
           <div class="two">
-            <label>Téléphone<input v-model="entry.phone"/></label>
-            <label>Société<input v-model="entry.company"/></label>
+            <label>Téléphone<input v-model="entry.phone" placeholder="0612345678"/></label>
+            <label>Société / Entreprise<input v-model="entry.company" placeholder="Ex: SARL Import Express"/></label>
           </div>
-          <label>Email<input v-model="entry.email" type="email"/></label>
+          <label>Email<input v-model="entry.email" type="email" placeholder="contact@fournisseur.com"/></label>
+          <div class="two" style="margin-top:10px;">
+            <label>Montant Total des Achats / Stock (MAD)
+              <input v-model.number="entry.totalPurchases" type="number" min="0" placeholder="Ex: 5000"/>
+            </label>
+            <label>Montant Réglé / Payé (MAD)
+              <input v-model.number="entry.totalPaid" type="number" min="0" placeholder="Ex: 3000"/>
+            </label>
+          </div>
+          <div v-if="(Number(entry.totalPurchases || 0) - Number(entry.totalPaid || 0)) > 0" class="credit-warning-badge danger" style="margin-top:8px;">
+            ⚠️ Reste Dû / Dette à payer : <b>{{ money(Number(entry.totalPurchases || 0) - Number(entry.totalPaid || 0)) }}</b> (كايسالونا)
+          </div>
         </template>
         <template v-else>
           <div class="two">
@@ -2045,10 +2202,37 @@ onMounted(async () => {
           <button type="button" class="quiet danger" style="color: #ef4444; border: 1px solid #fee2e2; font-weight: 600;" @click="executeDeleteSale(false)">
             🗑️ Supprimer la commande sans toucher au stock
           </button>
-          <button type="button" class="quiet" style="margin-top: 4px;" @click="deleteSaleModal = null">
-            Annuler
-          </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Pay Supplier Debt Modal -->
+    <div v-if="paySupplierModal" class="overlay" @click.self="paySupplierModal = null">
+      <div class="modal card" style="max-width: 480px; width: 100%; padding: 24px; background: #fff; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+        <div class="modal-head" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <p class="eyebrow" style="color:#d97706;">RÈGLEMENT DE DETTE (تأدية الدين)</p>
+            <h2 style="margin: 0; font-size: 18px;">Fournisseur: {{ paySupplierModal.name }}</h2>
+          </div>
+          <button type="button" class="icon" @click="paySupplierModal = null"><X :size="18"/></button>
+        </div>
+        <form @submit.prevent="executePaySupplierDebt">
+          <div style="background:#fefce8; border:1px solid #fef08a; border-radius:8px; padding:12px; margin-bottom:16px; font-size:13px; color:#854d0e;">
+            Dette actuelle : <b>{{ money(Number(paySupplierModal.totalPurchases || 0) - Number(paySupplierModal.totalPaid || 0)) }}</b> (كايسالونا)
+          </div>
+          <label style="display:block; margin-bottom:12px;">
+            <span style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block;">Montant à verser / régler (MAD)</span>
+            <input v-model.number="paySupplierAmount" type="number" min="1" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ddd; font-weight: 700; font-size: 16px; color:#16a34a;"/>
+          </label>
+          <label class="switch" style="display:flex; align-items:center; gap:8px; margin-bottom:16px; font-size:13px; cursor:pointer;">
+            <input v-model="paySupplierAddExpense" type="checkbox" />
+            <span>Enregistrer ce règlement comme dépense f-Finance (Achat Stock)</span>
+          </label>
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+            <button type="button" class="quiet" @click="paySupplierModal = null">Annuler</button>
+            <button type="submit" class="primary" style="background:#16a34a; border-color:#16a34a;">Confirmer le règlement ✓</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
