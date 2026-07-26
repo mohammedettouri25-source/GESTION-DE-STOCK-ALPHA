@@ -1714,7 +1714,7 @@ onMounted(async () => {
         </div>
         <div class="panel orders-list">
           <div v-if="shop.sales.length" class="table">
-            <div v-for="sale in shop.sales" :key="sale.id">
+            <div class="order-row" v-for="sale in shop.sales" :key="sale.id">
               <span><b>{{sale.number || '—'}}</b><small>{{sale.createdAt ? new Date(sale.createdAt).toLocaleString('fr-MA') : '—'}}</small></span>
               <span><b>{{sale.customer?.name||'Vente comptoir'}}</b><small v-if="sale.shipment?.tracking">Ozon : {{sale.shipment.tracking}}</small></span>
               <strong>{{money(sale.total)}}</strong>
@@ -1781,60 +1781,62 @@ onMounted(async () => {
 
         <div class="panel directory">
           <div v-if="(shop.active==='customers' ? (shop.customers || []) : (shop.suppliers || [])).length" class="table">
-            <div v-for="person in (shop.active==='customers' ? (shop.customers || []) : (shop.suppliers || []))" :key="person.id || person.name">
+            <div class="directory-row" v-for="person in (shop.active==='customers' ? (shop.customers || []) : (shop.suppliers || []))" :key="person.id || person.name">
               <span>
                 <b>{{person.name}}</b>
                 <small>{{person.phone || person.email || 'Aucun contact'}}</small>
               </span>
               <span>{{person.company || person.city || '—'}}</span>
               
-              <template v-if="shop.active === 'suppliers'">
-                <div style="display:flex; flex-direction:column; gap:2px; font-size:12px;">
-                  <span>Achats Stock: <b>{{money(person.totalPurchases || 0)}}</b></span>
-                  <span style="color:#16a34a;">Montant Payé: {{money(person.totalPaid || 0)}}</span>
-                </div>
-                <div>
-                  <span
-                    v-if="(Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) > 0"
-                    class="credit-warning-badge danger"
-                    style="display:inline-block; font-size:11px; padding:4px 8px;"
-                  >
-                    🔴 Dette: {{ money(Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) }} (كايسالونا)
-                  </span>
-                  <span
-                    v-else
-                    class="credit-warning-badge success"
-                    style="display:inline-block; font-size:11px; padding:4px 8px;"
-                  >
-                    🟢 Solde Réglé (100%)
-                  </span>
-                </div>
-              </template>
-              <template v-else>
-                <div style="display:flex; flex-direction:column; gap:2px; font-size:12px;">
-                  <span v-if="Number(person.totalPurchases || 0) > 0">Crédit total: <b style="color:#dc2626;">{{money(person.totalPurchases || 0)}}</b></span>
-                  <span v-if="Number(person.totalPaid || 0) > 0" style="color:#16a34a;">Montant Payé: {{money(person.totalPaid || 0)}}</span>
-                  <span v-if="!Number(person.totalPurchases || 0)">{{person.address || person.city || '—'}}</span>
-                </div>
-                <div v-if="Number(person.totalPurchases || 0) > 0">
-                  <span
-                    v-if="(Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) > 0"
-                    class="credit-warning-badge danger"
-                    style="display:inline-block; font-size:11px; padding:4px 8px;"
-                  >
-                    🔴 Crédit: {{ money(Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) }} (كاندسالوه)
-                  </span>
-                  <span
-                    v-else
-                    class="credit-warning-badge success"
-                    style="display:inline-block; font-size:11px; padding:4px 8px;"
-                  >
-                    🟢 Soldé (تخالص)
-                  </span>
-                </div>
-              </template>
+              <div>
+                <template v-if="shop.active === 'suppliers'">
+                  <div style="display:flex; flex-direction:column; gap:2px; font-size:12px;">
+                    <span>Achats Stock: <b>{{money(person.totalPurchases || 0)}}</b></span>
+                    <span style="color:#16a34a;">Montant Payé: {{money(person.totalPaid || 0)}}</span>
+                  </div>
+                  <div style="margin-top:4px;">
+                    <span
+                      v-if="(Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) > 0"
+                      class="credit-warning-badge danger"
+                      style="display:inline-block; font-size:11px; padding:4px 8px;"
+                    >
+                      🔴 Dette: {{ money(Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) }} (كايسالونا)
+                    </span>
+                    <span
+                      v-else
+                      class="credit-warning-badge success"
+                      style="display:inline-block; font-size:11px; padding:4px 8px;"
+                    >
+                      🟢 Solde Réglé (100%)
+                    </span>
+                  </div>
+                </template>
+                <template v-else>
+                  <div style="display:flex; flex-direction:column; gap:2px; font-size:12px;">
+                    <span v-if="Number(person.totalPurchases || 0) > 0">Crédit total: <b style="color:#dc2626;">{{money(person.totalPurchases || 0)}}</b></span>
+                    <span v-if="Number(person.totalPaid || 0) > 0" style="color:#16a34a;">Montant Payé: {{money(person.totalPaid || 0)}}</span>
+                    <span v-if="!Number(person.totalPurchases || 0)">{{person.address || person.city || '—'}}</span>
+                  </div>
+                  <div v-if="Number(person.totalPurchases || 0) > 0" style="margin-top:4px;">
+                    <span
+                      v-if="(Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) > 0"
+                      class="credit-warning-badge danger"
+                      style="display:inline-block; font-size:11px; padding:4px 8px;"
+                    >
+                      🔴 Crédit: {{ money(Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) }} (كاندسالوه)
+                    </span>
+                    <span
+                      v-else
+                      class="credit-warning-badge success"
+                      style="display:inline-block; font-size:11px; padding:4px 8px;"
+                    >
+                      🟢 Soldé (تخالص)
+                    </span>
+                  </div>
+                </template>
+              </div>
 
-              <div style="display:flex; gap:6px; align-items:center;">
+              <div class="directory-actions">
                 <button v-if="shop.active === 'suppliers' && (Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) > 0" class="quiet" style="color:#d97706; font-weight:600; font-size:12px; border:1px solid #fef08a; background:#fefce8; padding:4px 8px; border-radius:6px;" @click.stop="openPaySupplierDebt(person)" title="Régler la dette fournisseur">
                   💰 Régler
                 </button>
