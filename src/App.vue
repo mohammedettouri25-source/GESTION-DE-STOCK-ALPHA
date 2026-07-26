@@ -627,8 +627,34 @@ function saveWhatsappSettings() {
   shop.notify('Paramètres WhatsApp & Clé API OpenAI enregistrés ✓')
 }
 
-// Live Conversations State for WhatsApp Inbox
+// Live Conversations State for WhatsApp Inbox & Web Clone
 const activeWaConvId = ref('conv-1')
+const showNewWaChatModal = ref(false)
+const newChatPhone = ref('')
+const newChatName = ref('')
+
+function startNewWaChat() {
+  if (!newChatPhone.value) return shop.notify('Veuillez saisir un numéro de téléphone')
+  const newId = 'conv-' + Date.now()
+  const cleanPhone = newChatPhone.value.trim()
+  const newConv = {
+    id: newId,
+    customerName: newChatName.value.trim() || `الزبون (${cleanPhone})`,
+    phone: cleanPhone,
+    orderNumber: '',
+    unreadCount: 0,
+    lastTime: 'À l\'instant',
+    messages: [
+      { sender: 'bot', text: `👋 مرحباً بك! تم فتح المحادثة المباشرة مع ${newChatName.value || cleanPhone}. كيف يمكننا مساعدتك اليوم؟ 🛍️` }
+    ]
+  }
+  waConversations.value.unshift(newConv)
+  activeWaConvId.value = newId
+  showNewWaChatModal.value = false
+  newChatPhone.value = ''
+  newChatName.value = ''
+  shop.notify(`Nouvelle conversation WhatsApp créée avec ${cleanPhone} ✓`)
+}
 
 const waConversations = ref([
   {
@@ -2144,12 +2170,15 @@ onMounted(async () => {
           </article>
         </div>
 
-        <!-- SubTab: Inbox (Live WhatsApp Chat Box) -->
+        <!-- SubTab: Inbox (WhatsApp Web Clone Interface) -->
         <div v-if="waSubTab === 'inbox'" class="whatsapp-inbox-layout">
           <!-- Left Sidebar Conversations List -->
           <div class="wa-conv-sidebar">
-            <div class="wa-conv-search">
-              <input type="text" placeholder="Rechercher un زبون / رقم..." />
+            <div class="wa-conv-search" style="display:flex; gap:8px;">
+              <input type="text" placeholder="Rechercher un زبون / رقم..." style="flex:1;" />
+              <button class="primary" style="background:#16a34a; border:none; padding:6px 10px; font-size:11px; white-space:nowrap;" title="Démarrer une nouvelle discussion WhatsApp" @click="showNewWaChatModal = true">
+                <Plus :size="14"/> Échange
+              </button>
             </div>
             <div class="wa-conv-list">
               <div
@@ -2992,6 +3021,32 @@ onMounted(async () => {
           <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
             <button type="button" class="quiet" @click="paySupplierModal = null">Annuler</button>
             <button type="submit" class="primary" style="background:#16a34a; border-color:#16a34a;">Confirmer le règlement ✓</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- New WhatsApp Chat Modal -->
+    <div v-if="showNewWaChatModal" class="overlay" @click.self="showNewWaChatModal = false">
+      <div class="modal card" style="max-width: 440px; width: 95%; padding: 24px; background: #ffffff; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h2 style="margin:0; font-size:16px; display:flex; align-items:center; gap:8px;">
+            <MessageCircle :size="18" style="color:#16a34a;"/> Nouveau Chat WhatsApp
+          </h2>
+          <button class="quiet" @click="showNewWaChatModal = false"><X :size="18"/></button>
+        </div>
+        <form @submit.prevent="startNewWaChat">
+          <label style="display:block; margin-bottom:12px;">
+            <span style="font-size:12px; font-weight:600; margin-bottom:4px; display:block;">Numéro de Téléphone (ex: 0661234567)</span>
+            <input v-model="newChatPhone" type="text" required placeholder="06..." style="width:100%; padding:10px; border-radius:6px; border:1px solid #cbd5e1;"/>
+          </label>
+          <label style="display:block; margin-bottom:16px;">
+            <span style="font-size:12px; font-weight:600; margin-bottom:4px; display:block;">Nom du Client / Tag (Optionnel)</span>
+            <input v-model="newChatName" type="text" placeholder="Ex: Client WhatsApp" style="width:100%; padding:10px; border-radius:6px; border:1px solid #cbd5e1;"/>
+          </label>
+          <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button type="button" class="quiet" @click="showNewWaChatModal = false">Annuler</button>
+            <button type="submit" class="primary" style="background:#16a34a; border:none;">Démarrer le Chat 💬</button>
           </div>
         </form>
       </div>
