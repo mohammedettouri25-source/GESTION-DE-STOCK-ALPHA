@@ -100,14 +100,22 @@ export const useShop = defineStore('shop', {
 
     async saveProduct(product) {
       try {
+        const autoBarcode = '3' + Math.floor(10000000 + Math.random() * 90000000)
+        const namePrefix = (product.name || '').trim().slice(0, 3).toUpperCase().replace(/[^A-Z]/g, 'PRD') || 'PRD'
+        const autoSku = `${namePrefix}-${Math.floor(1000 + Math.random() * 9000)}`
+
         const p = {
           ...product,
           id: product.id || crypto.randomUUID(),
+          sku: (product.sku && product.sku.trim()) ? product.sku.trim() : autoSku,
+          barcode: (product.barcode && product.barcode.trim()) ? product.barcode.trim() : autoBarcode,
+          category: (product.category && product.category.trim()) ? product.category.trim() : 'Général',
           price: Number(product.price) || 0,
           purchasePrice: Number(product.purchasePrice) || 0,
-          variants: (product.variants || []).map(v => ({
+          variants: (product.variants || []).map((v, idx) => ({
             ...v,
             id: v.id || crypto.randomUUID(),
+            barcode: (v.barcode && v.barcode.trim()) ? v.barcode.trim() : ((product.barcode || autoBarcode) + String(idx + 1)),
             stock: Number(v.stock) || 0,
             min: Number(v.min) || 0
           }))
@@ -191,6 +199,13 @@ export const useShop = defineStore('shop', {
 
     removeCartLine(variantId) {
       this.cart = this.cart.filter(x => x.variantId !== variantId)
+    },
+
+    updateCartLinePrice(variantId, newPrice) {
+      const line = this.cart.find(x => x.variantId === variantId)
+      if (line) {
+        line.price = Math.max(0, Number(newPrice) || 0)
+      }
     },
 
     clearCart() {
@@ -331,16 +346,20 @@ export const useShop = defineStore('shop', {
 
     async updateSale(updatedSale) {
       try {
-        const index = this.sales.findIndex(s => s.id === updatedSale.id)
+        if (!updatedSale || !updatedSale.id) return
+        
+        // Clean Vue proxies to prevent IndexedDB DataCloneError
+        const raw = JSON.parse(JSON.stringify(updatedSale))
+        const index = this.sales.findIndex(s => s.id === raw.id)
         if (index < 0) return
 
-        const subtotal = updatedSale.subtotal || (updatedSale.items || []).reduce((n, x) => n + (x.price * x.quantity), 0)
-        const discount = Math.max(0, Number(updatedSale.discount) || 0)
-        const shipping = Math.max(0, Number(updatedSale.shipping) || 0)
-        const total = Number(updatedSale.total) >= 0 ? Number(updatedSale.total) : Math.max(0, subtotal - discount + shipping)
+        const subtotal = (raw.items || []).reduce((n, x) => n + ((Number(x.price) || 0) * (Number(x.quantity) || 1)), 0)
+        const discount = Math.max(0, Number(raw.discount) || 0)
+        const shipping = Math.max(0, Number(raw.shipping) || 0)
+        const total = Number(raw.total) >= 0 ? Number(raw.total) : Math.max(0, subtotal - discount + shipping)
 
         const saleToSave = {
-          ...updatedSale,
+          ...raw,
           subtotal,
           discount,
           shipping,
@@ -357,7 +376,7 @@ export const useShop = defineStore('shop', {
           supabase.from('sales').upsert({
             id: saleToSave.id,
             number: saleToSave.number || '',
-            total: saleToSave.total,
+            total: Number(saleToSave.total) || 0,
             payment_method: saleToSave.payment || 'cash'
           }, { onConflict: 'id' }).then(() => {}).catch(() => {})
         }
@@ -365,7 +384,7 @@ export const useShop = defineStore('shop', {
         this.notify(`Commande ${saleToSave.number} mise à jour ✓`)
       } catch (error) {
         console.error('updateSale error:', error)
-        this.notify(`Erreur : ${error.message}`)
+        this.notify(`Erreur mise à jour : ${error.message || error}`)
       }
     },
 

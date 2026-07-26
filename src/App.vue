@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useShop } from './stores/shop'
-import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText, Bot, Sparkles, Lock, LogOut, KeyRound, Eye, EyeOff, MessageCircle, Send } from 'lucide-vue-next'
+import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText, Bot, Sparkles, Lock, LogOut, KeyRound, Eye, EyeOff, MessageCircle, Send, TrendingUp, Calendar, Download, ChevronDown } from 'lucide-vue-next'
 import { createOzonParcel, getOzonParcelInfo } from './services/ozon'
 import { OZON_CITIES } from './services/ozonCities'
 
@@ -84,7 +84,32 @@ const aiModal = ref(false)
 const aiPrompt = ref('')
 const aiAnalyzing = ref(false)
 
-const authenticated = ref(localStorage.getItem('alpha-auth') === 'true')
+const SESSION_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
+
+function checkAuthSession() {
+  const auth = localStorage.getItem('alpha-auth') === 'true'
+  const authTimeStr = localStorage.getItem('alpha-auth-time')
+  const authTime = authTimeStr ? parseInt(authTimeStr, 10) : 0
+  const now = Date.now()
+
+  if (auth) {
+    if (!authTime || (now - authTime) >= SESSION_TIMEOUT_MS) {
+      authenticated.value = false
+      localStorage.removeItem('alpha-auth')
+      localStorage.removeItem('alpha-auth-time')
+      loginError.value = 'Session expirée (10 min). Veuillez vous reconnecter.'
+      if (authTime) {
+        shop.notify('Session expirée après 10 minutes. Reconnexion requise.')
+      }
+      return false
+    }
+    return true
+  }
+  authenticated.value = false
+  return false
+}
+
+const authenticated = ref(checkAuthSession())
 const loginPassword = ref('')
 const loginError = ref('')
 const showPass = ref(false)
@@ -94,6 +119,7 @@ function handleLogin() {
   if (loginPassword.value.trim() === masterPin.value) {
     authenticated.value = true
     localStorage.setItem('alpha-auth', 'true')
+    localStorage.setItem('alpha-auth-time', Date.now().toString())
     loginError.value = ''
     loginPassword.value = ''
     shop.notify('Connexion réussie ! Bienvenue sur Alpha Shop07')
@@ -105,6 +131,7 @@ function handleLogin() {
 function handleLogout() {
   authenticated.value = false
   localStorage.removeItem('alpha-auth')
+  localStorage.removeItem('alpha-auth-time')
   shop.notify('Déconnexion réussie')
 }
 
@@ -348,8 +375,56 @@ function processAiAgentProduct() {
 }
 
 
-const blank = () => ({ name: '', sku: '', barcode: '', category: 'Général', brand: '', price: 0, purchasePrice: 0, variants: [{ color: 'Noir', size: 'Unique', stock: 0, min: 2, barcode: '' }] })
+function generateAutoBarcode() {
+  return '3' + Math.floor(10000000 + Math.random() * 90000000)
+}
+
+function generateAutoSku(name = '') {
+  const prefix = name.trim().length >= 2
+    ? name.trim().slice(0, 3).toUpperCase().replace(/[^A-Z]/g, 'PRD')
+    : 'PRD'
+  const randomNum = Math.floor(1000 + Math.random() * 9000)
+  return `${prefix}-${randomNum}`
+}
+
+function detectAutoCategory(name = '') {
+  const text = name.toLowerCase()
+  if (/t-?shirt|polo|hoodie|sweat|pantalon|jean|veste|chemise|robe|jupe|clt|textile/i.test(text)) return 'Textile'
+  if (/casquette|chapeau|sac|portefeuille|ceinture|lunette|montre|bijou|accessoire/i.test(text)) return 'Accessoires'
+  if (/chaussure|basket|sneaker|botte|claquette/i.test(text)) return 'Chaussures'
+  if (/creme|parfum|savon|shampoing|beaute/i.test(text)) return 'Beauté & Cosmétique'
+  if (/phone|tel|ecouteur|chargeur|coque|cable|tech|pc/i.test(text)) return 'Électronique'
+  return 'Général'
+}
+
+const blank = () => {
+  const autoBarcode = generateAutoBarcode()
+  const autoSku = generateAutoSku()
+  return {
+    name: '',
+    sku: autoSku,
+    barcode: autoBarcode,
+    category: 'Général',
+    brand: 'Alpha',
+    price: 0,
+    purchasePrice: 0,
+    variants: [{ color: 'Noir', size: 'Unique', stock: 0, min: 2, barcode: autoBarcode + '1' }]
+  }
+}
 const draft = ref(blank())
+
+function onProductNameInput() {
+  if (!draft.value.id) { // Only auto-generate when creating a new product
+    draft.value.category = detectAutoCategory(draft.value.name)
+    const newSkuPrefix = draft.value.name.trim().length >= 2
+      ? draft.value.name.trim().slice(0, 3).toUpperCase().replace(/[^A-Z]/g, 'PRD')
+      : 'PRD'
+    const numPart = (draft.value.sku && draft.value.sku.includes('-'))
+      ? draft.value.sku.split('-')[1]
+      : Math.floor(1000 + Math.random() * 9000)
+    draft.value.sku = `${newSkuPrefix}-${numPart}`
+  }
+}
 
 async function removeCurrentProduct() {
   if (!draft.value.id) return
@@ -358,8 +433,270 @@ async function removeCurrentProduct() {
     productModal.value = false
   }
 }
-const order = ref({ discount: 0, shipping: 0, customer: { name: '', phone: '', cityId: '', city: '', address: '', note: '' }, sendOzon: true, ozon: { customerId: localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '89381', apiKey: localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || 'db4545-4ede23-78ef27-868f4a-fa5359', declaredValue: '', open: '1', fragile: '0', replace: '0' } })
-const nav = [['dashboard', `Vue d'ensemble`, LayoutDashboard], ['products', 'Produits', Package], ['pos', 'Point de vente', ShoppingCart], ['orders', 'Commandes', Truck], ['customers', 'Clients', Users], ['suppliers', 'Fournisseurs', Factory], ['finance', 'Finance', WalletCards], ['reports', 'Rapports', BarChart3], ['settings', 'Réglages', Settings]]
+const order = ref({
+  type: 'online', // 'online' | 'offline'
+  discount: 0,
+  shipping: 0,
+  paidAmount: null,
+  customer: { name: '', phone: '', cityId: '', city: '', address: '', note: '' },
+  sendOzon: true,
+  ozon: {
+    customerId: localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '89381',
+    apiKey: localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || 'db4545-4ede23-78ef27-868f4a-fa5359',
+    declaredValue: '',
+    open: '1',
+    fragile: '0',
+    replace: '0'
+  }
+})
+
+function setSaleType(type) {
+  order.value.type = type
+  if (type === 'offline') {
+    order.value.sendOzon = false
+    order.value.shipping = 0
+  } else {
+    order.value.sendOzon = true
+  }
+}
+
+const actualPaidAmount = computed(() => {
+  if (order.value.paidAmount === null || order.value.paidAmount === undefined || order.value.paidAmount === '') {
+    return orderTotal.value
+  }
+  return Number(order.value.paidAmount) || 0
+})
+
+const remainingBalance = computed(() => {
+  return Math.max(0, orderTotal.value - actualPaidAmount.value)
+})
+const nav = [['dashboard', `Vue d'ensemble`, LayoutDashboard], ['products', 'Produits', Package], ['pos', 'Point de vente', ShoppingCart], ['orders', 'Commandes', Truck], ['customers', 'Clients', Users], ['suppliers', 'Fournisseurs', Factory], ['finance', 'Finance', WalletCards], ['profits', 'Rapport Profits 📈', TrendingUp], ['reports', 'Rapports', BarChart3], ['settings', 'Réglages', Settings]]
+
+// --- Daily Profit Reports State & Calculations ---
+const profitPreset = ref('month')
+const todayStr = new Date().toISOString().slice(0, 10)
+const firstDayOfMonthStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
+
+const profitStartDate = ref(firstDayOfMonthStr)
+const profitEndDate = ref(todayStr)
+const expandedProfitDate = ref(null)
+
+function setProfitPreset(preset) {
+  profitPreset.value = preset
+  const now = new Date()
+  const today = now.toISOString().slice(0, 10)
+
+  if (preset === 'today') {
+    profitStartDate.value = today
+    profitEndDate.value = today
+  } else if (preset === 'yesterday') {
+    const y = new Date(now)
+    y.setDate(y.getDate() - 1)
+    const yStr = y.toISOString().slice(0, 10)
+    profitStartDate.value = yStr
+    profitEndDate.value = yStr
+  } else if (preset === '7days') {
+    const d7 = new Date(now)
+    d7.setDate(d7.getDate() - 6)
+    profitStartDate.value = d7.toISOString().slice(0, 10)
+    profitEndDate.value = today
+  } else if (preset === 'month') {
+    profitStartDate.value = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+    profitEndDate.value = today
+  } else if (preset === 'all') {
+    profitStartDate.value = ''
+    profitEndDate.value = ''
+  }
+}
+
+function toggleExpandProfitDate(dateStr) {
+  if (expandedProfitDate.value === dateStr) {
+    expandedProfitDate.value = null
+  } else {
+    expandedProfitDate.value = dateStr
+  }
+}
+
+const dailyProfitsReport = computed(() => {
+  const map = new Map()
+
+  const validSales = (shop.sales || []).filter(s => s && !s.deleted && s.createdAt)
+  validSales.forEach(sale => {
+    const dateKey = new Date(sale.createdAt).toISOString().slice(0, 10)
+
+    if (profitStartDate.value && dateKey < profitStartDate.value) return
+    if (profitEndDate.value && dateKey > profitEndDate.value) return
+
+    if (!map.has(dateKey)) {
+      map.set(dateKey, {
+        date: dateKey,
+        salesCount: 0,
+        itemsCount: 0,
+        revenue: 0,
+        cogs: 0,
+        expenses: 0,
+        itemsMap: new Map()
+      })
+    }
+
+    const dayData = map.get(dateKey)
+    dayData.salesCount += 1
+    dayData.revenue += Number(sale.total) || 0
+
+    ;(sale.items || []).forEach(item => {
+      const q = Number(item.quantity) || 1
+      dayData.itemsCount += q
+
+      const product = shop.products.find(p => p.id === item.productId || p.sku === item.sku)
+      const costPerUnit = Number(item.purchasePrice || product?.purchasePrice || 0)
+      const totalCost = costPerUnit * q
+      const pricePerUnit = Number(item.price || 0)
+      const totalRev = pricePerUnit * q
+      const itemProfit = totalRev - totalCost
+
+      dayData.cogs += totalCost
+
+      const itemKey = `${item.name} (${item.variant || 'Standard'})`
+      if (!dayData.itemsMap.has(itemKey)) {
+        dayData.itemsMap.set(itemKey, {
+          name: item.name,
+          variant: item.variant || '',
+          qty: 0,
+          unitPrice: pricePerUnit,
+          unitCost: costPerUnit,
+          totalRev: 0,
+          totalCost: 0,
+          profit: 0
+        })
+      }
+      const prodItem = dayData.itemsMap.get(itemKey)
+      prodItem.qty += q
+      prodItem.totalRev += totalRev
+      prodItem.totalCost += totalCost
+      prodItem.profit += itemProfit
+    })
+  })
+
+  const validExpenses = (shop.expenses || []).filter(e => e && !e.deleted && (e.date || e.createdAt))
+  validExpenses.forEach(exp => {
+    const dateKey = (exp.date || exp.createdAt).slice(0, 10)
+
+    if (profitStartDate.value && dateKey < profitStartDate.value) return
+    if (profitEndDate.value && dateKey > profitEndDate.value) return
+
+    if (!map.has(dateKey)) {
+      map.set(dateKey, {
+        date: dateKey,
+        salesCount: 0,
+        itemsCount: 0,
+        revenue: 0,
+        cogs: 0,
+        expenses: 0,
+        itemsMap: new Map()
+      })
+    }
+
+    const dayData = map.get(dateKey)
+    dayData.expenses += Number(exp.amount) || 0
+  })
+
+  const report = Array.from(map.values()).map(d => {
+    const grossProfit = d.revenue - d.cogs
+    const netProfit = grossProfit - d.expenses
+    const margin = d.revenue > 0 ? ((netProfit / d.revenue) * 100).toFixed(1) : 0
+    return {
+      ...d,
+      grossProfit,
+      netProfit,
+      margin,
+      itemsList: Array.from(d.itemsMap.values())
+    }
+  })
+
+  return report.sort((a, b) => b.date.localeCompare(a.date))
+})
+
+const profitSummary = computed(() => {
+  let revenue = 0
+  let cogs = 0
+  let expenses = 0
+  let salesCount = 0
+  let itemsCount = 0
+
+  dailyProfitsReport.value.forEach(d => {
+    revenue += d.revenue
+    cogs += d.cogs
+    expenses += d.expenses
+    salesCount += d.salesCount
+    itemsCount += d.itemsCount
+  })
+
+  const grossProfit = revenue - cogs
+  const netProfit = grossProfit - expenses
+  const margin = revenue > 0 ? ((netProfit / revenue) * 100).toFixed(1) : 0
+
+  return { revenue, cogs, expenses, grossProfit, netProfit, margin, salesCount, itemsCount }
+})
+
+const topProfitableProducts = computed(() => {
+  const prodMap = new Map()
+
+  const validSales = (shop.sales || []).filter(s => s && !s.deleted && s.createdAt)
+  validSales.forEach(sale => {
+    const dateKey = new Date(sale.createdAt).toISOString().slice(0, 10)
+    if (profitStartDate.value && dateKey < profitStartDate.value) return
+    if (profitEndDate.value && dateKey > profitEndDate.value) return
+
+    ;(sale.items || []).forEach(item => {
+      const q = Number(item.quantity) || 1
+      const product = shop.products.find(p => p.id === item.productId || p.sku === item.sku)
+      const cost = Number(item.purchasePrice || product?.purchasePrice || 0) * q
+      const rev = Number(item.price || 0) * q
+      const profit = rev - cost
+
+      const key = item.productId || item.name
+      if (!prodMap.has(key)) {
+        prodMap.set(key, {
+          id: key,
+          name: item.name,
+          category: product?.category || 'Général',
+          qty: 0,
+          revenue: 0,
+          cost: 0,
+          profit: 0
+        })
+      }
+      const entry = prodMap.get(key)
+      entry.qty += q
+      entry.revenue += rev
+      entry.cost += cost
+      entry.profit += profit
+    })
+  })
+
+  return Array.from(prodMap.values())
+    .map(p => ({
+      ...p,
+      margin: p.revenue > 0 ? ((p.profit / p.revenue) * 100).toFixed(1) : 0
+    }))
+    .sort((a, b) => b.profit - a.profit)
+})
+
+function exportProfitsCsv() {
+  const rows = [
+    'Date;Ventes;Articles;Chiffre d\'Affaires (MAD);Coût d\'Achat (COGS MAD);Dépenses (MAD);Bénéfice Net (MAD);Marge (%)',
+    ...dailyProfitsReport.value.map(d =>
+      `${d.date};${d.salesCount};${d.itemsCount};${d.revenue};${d.cogs};${d.expenses};${d.netProfit};${d.margin}%`
+    )
+  ]
+  const url = URL.createObjectURL(new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `rapport-benefices-${profitStartDate.value || 'debut'}_au_${profitEndDate.value || 'fin'}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  shop.notify('Rapport des bénéfices exporté en CSV ✓')
+}
 const loadList = (key, initial = []) => ref(JSON.parse(localStorage.getItem(key) || JSON.stringify(initial)))
 const customerList = loadList('alpha-customers', [])
 const supplierList = loadList('alpha-suppliers', [])
@@ -435,29 +772,37 @@ function exportSales() { const rows = ['Numéro;Date;Total;Paiement;Client', ...
 function openCheckout() { if (!shop.cart.length) return shop.notify('Ajoutez au moins un article au panier'); mobileCartSheet.value = false; checkoutModal.value = true }
 const orderTotal = computed(() => Math.max(0, shop.cartTotal - (Number(order.value.discount) || 0) + (Number(order.value.shipping) || 0)))
 
-// Bug fix: submitOrder now uses finally to always unblock the button, and resets order after success
 async function submitOrder() {
   const c = order.value.customer, o = order.value.ozon
-  if (order.value.sendOzon && (!c.name || !c.phone || (!c.cityId && !c.city) || !c.address)) {
+  if (order.value.sendOzon && order.value.type === 'online' && (!c.name || !c.phone || (!c.cityId && !c.city) || !c.address)) {
     return shop.notify('Veuillez renseigner le nom, téléphone, ville et adresse du client')
   }
   submitting.value = true
   try {
-    const sale = await shop.checkout(payment.value, { discount: order.value.discount, shipping: order.value.shipping, customer: c })
-    if (sale && order.value.sendOzon) {
+    const sale = await shop.checkout(payment.value, {
+      discount: order.value.discount,
+      shipping: order.value.shipping,
+      paidAmount: actualPaidAmount.value,
+      remainingBalance: remainingBalance.value,
+      saleType: order.value.type,
+      customer: {
+        ...c,
+        name: c.name || (order.value.type === 'offline' ? 'Vente Comptoir' : '')
+      }
+    })
+    if (sale && order.value.sendOzon && order.value.type === 'online') {
       localStorage.setItem('ozon-customer-id', o.customerId)
       localStorage.setItem('ozon-api-key', o.apiKey)
       try {
         let cityIdParam = String(c.cityId || '').trim()
         const query = String(c.city || '').trim().toLowerCase()
 
-        // Match against official Ozon cities database
         if (query) {
           const match = OZON_CITIES.find(city => city.name.toLowerCase() === query || city.name.toLowerCase().includes(query))
           if (match) cityIdParam = String(match.id)
         }
         if (!cityIdParam || cityIdParam === '1' || cityIdParam === '0') {
-          cityIdParam = '2165' // Default Casablanca ID (2165)
+          cityIdParam = '2165'
         }
 
         const validId = (o.customerId && /^\d+$/.test(String(o.customerId).trim())) ? String(o.customerId).trim() : (import.meta.env.VITE_OZON_CUSTOMER_ID || '89381')
@@ -491,8 +836,15 @@ async function submitOrder() {
     }
     if (sale) {
       checkoutModal.value = false
-      // Reset order form after successful checkout
-      order.value = { discount: 0, shipping: 0, customer: { name: '', phone: '', cityId: '', city: '', address: '', note: '' }, sendOzon: true, ozon: order.value.ozon }
+      order.value = {
+        type: 'online',
+        discount: 0,
+        shipping: 0,
+        paidAmount: null,
+        customer: { name: '', phone: '', cityId: '', city: '', address: '', note: '' },
+        sendOzon: true,
+        ozon: order.value.ozon
+      }
       showInvoice(sale)
     }
   } finally {
@@ -501,6 +853,13 @@ async function submitOrder() {
 }
 async function verifyShipment(sale) { try { const result = await getOzonParcelInfo({ customerId: settings.value.ozonId, apiKey: settings.value.ozonKey, trackingNumber: sale.shipment?.tracking }); await shop.attachShipment(sale.id, { tracking: result['TRACKING-NUMBER'] || sale.shipment.tracking, city: result.CITY_NAME, status: result.STATUS || 'verified', response: result }); shop.notify(`Colis vérifié : ${result['TRACKING-NUMBER'] || sale.shipment.tracking}`) } catch (error) { shop.notify(`Vérification Ozon impossible : ${error.message}`) } }
 onMounted(async () => {
+  checkAuthSession()
+  setInterval(() => {
+    if (authenticated.value) {
+      checkAuthSession()
+    }
+  }, 10000)
+
   await shop.init()
   const params = new URLSearchParams(window.location.search)
   const invNum = params.get('invoice')
@@ -733,8 +1092,21 @@ onMounted(async () => {
           <aside class="cart">
             <div class="cart-title"><h2>Panier</h2><span>{{shop.cart.length}} articles</span></div>
             <div class="cart-lines">
-              <div v-for="line in shop.cart" :key="line.variantId">
-                <span><b>{{line.name}}</b><small>{{line.variant}} · {{money(line.price)}}</small></span>
+              <div v-for="line in shop.cart" :key="line.variantId" class="cart-line-item">
+                <div class="cart-line-info">
+                  <b>{{line.name}}</b>
+                  <small v-if="line.variant" style="display:block; color:#71717a;">{{line.variant}}</small>
+                  <div class="cart-line-price-edit">
+                    <span>Prix unitaire:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      v-model.number="line.price"
+                      class="inline-price-input"
+                      title="Modifier le prix de vente de cet article"
+                    /> MAD
+                  </div>
+                </div>
                 <div class="quantity">
                   <button type="button" @click="shop.decrementCartLine(line)"><Minus :size="13"/></button>
                   <b>{{line.quantity}}</b>
@@ -864,6 +1236,220 @@ onMounted(async () => {
         </div>
       </section>
 
+      <!-- Daily Profits & Margin Report View -->
+      <section v-else-if="shop.active==='profits'" class="page">
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">ADMIN · SUIVI FINANCIER DÉTAILLÉ</p>
+            <h1>Rapport de Profits Journaliers (أرباح المبيعات اليومية)</h1>
+          </div>
+          <button class="primary" @click="exportProfitsCsv">
+            <Download :size="17"/> Exporter le rapport CSV
+          </button>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="profit-filter-card">
+          <div class="filter-header">
+            <div class="filter-title">
+              <Calendar :size="18"/>
+              <b>Filtrer par période</b>
+            </div>
+            <div class="preset-buttons">
+              <button
+                type="button"
+                class="preset-btn"
+                :class="{ active: profitPreset === 'today' }"
+                @click="setProfitPreset('today')"
+              >Aujourd'hui</button>
+              <button
+                type="button"
+                class="preset-btn"
+                :class="{ active: profitPreset === 'yesterday' }"
+                @click="setProfitPreset('yesterday')"
+              >Hier</button>
+              <button
+                type="button"
+                class="preset-btn"
+                :class="{ active: profitPreset === '7days' }"
+                @click="setProfitPreset('7days')"
+              >7 Derniers Jours</button>
+              <button
+                type="button"
+                class="preset-btn"
+                :class="{ active: profitPreset === 'month' }"
+                @click="setProfitPreset('month')"
+              >Ce Mois-ci</button>
+              <button
+                type="button"
+                class="preset-btn"
+                :class="{ active: profitPreset === 'all' }"
+                @click="setProfitPreset('all')"
+              >Tout</button>
+            </div>
+          </div>
+          <div class="date-pickers">
+            <label>
+              <span>Date Début :</span>
+              <input type="date" v-model="profitStartDate" @change="profitPreset = 'custom'" />
+            </label>
+            <label>
+              <span>Date Fin :</span>
+              <input type="date" v-model="profitEndDate" @change="profitPreset = 'custom'" />
+            </label>
+          </div>
+        </div>
+
+        <!-- Summary KPI Cards -->
+        <div class="metrics profit-metrics">
+          <article class="profit-card">
+            <small>Chiffre d'Affaires (المبيعات)</small>
+            <strong class="text-blue">{{ money(profitSummary.revenue) }}</strong>
+            <em>{{ profitSummary.salesCount }} vente(s) · {{ profitSummary.itemsCount }} article(s)</em>
+          </article>
+          <article class="profit-card">
+            <small>Coût d'Achat COGS (التكلفة)</small>
+            <strong class="text-orange">{{ money(profitSummary.cogs) }}</strong>
+            <em>Prix d'achat des produits vendus</em>
+          </article>
+          <article class="profit-card">
+            <small>Dépenses Totales (المصاريف)</small>
+            <strong class="text-gray">{{ money(profitSummary.expenses) }}</strong>
+            <em>Dépenses enregistrées sur la période</em>
+          </article>
+          <article class="profit-card highlight">
+            <small>Bénéfice Net Total (الربح الصافي)</small>
+            <strong :class="profitSummary.netProfit >= 0 ? 'text-green' : 'text-danger'">
+              {{ money(profitSummary.netProfit) }}
+            </strong>
+            <em class="badge-profit">Marge Nette : {{ profitSummary.margin }} %</em>
+          </article>
+        </div>
+
+        <!-- Daily Profits Breakdown Table -->
+        <div class="panel profit-table-panel">
+          <div class="panel-title">
+            <div>
+              <h2>Rapport Journalier des Profits</h2>
+              <p>Détail jour par jour du chiffre d'affaires, des coûts, des dépenses et du bénéfice net</p>
+            </div>
+          </div>
+
+          <div v-if="dailyProfitsReport.length" class="profit-table">
+            <div class="profit-table-head">
+              <span>Date</span>
+              <span>Ventes</span>
+              <span>Articles</span>
+              <span>Ventes (MAD)</span>
+              <span>Coût Achat (COGS)</span>
+              <span>Dépenses (MAD)</span>
+              <span>Bénéfice Net (MAD)</span>
+              <span>Marge %</span>
+              <span>Détails</span>
+            </div>
+
+            <template v-for="d in dailyProfitsReport" :key="d.date">
+              <div
+                class="profit-table-row"
+                :class="{ expanded: expandedProfitDate === d.date }"
+                @click="toggleExpandProfitDate(d.date)"
+              >
+                <span class="date-cell">
+                  <Calendar :size="15"/>
+                  <b>{{ new Date(d.date).toLocaleDateString('fr-MA', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) }}</b>
+                </span>
+                <span><b>{{ d.salesCount }}</b> vente(s)</span>
+                <span>{{ d.itemsCount }} unité(s)</span>
+                <span class="font-bold">{{ money(d.revenue) }}</span>
+                <span class="text-muted">{{ money(d.cogs) }}</span>
+                <span class="text-muted">{{ money(d.expenses) }}</span>
+                <span>
+                  <strong :class="d.netProfit >= 0 ? 'profit-pill-success' : 'profit-pill-danger'">
+                    {{ d.netProfit >= 0 ? '+' : '' }}{{ money(d.netProfit) }}
+                  </strong>
+                </span>
+                <span><b>{{ d.margin }} %</b></span>
+                <button class="icon quiet">
+                  <ChevronDown :size="16" :class="{ rotate180: expandedProfitDate === d.date }" />
+                </button>
+              </div>
+
+              <!-- Expanded Itemized Products Breakdown -->
+              <div v-if="expandedProfitDate === d.date" class="profit-detail-drawer">
+                <div class="detail-drawer-head">
+                  <b>📦 Produits vendus le {{ new Date(d.date).toLocaleDateString('fr-MA') }}</b>
+                </div>
+                <table class="detail-products-table">
+                  <thead>
+                    <tr>
+                      <th>Produit & Variante</th>
+                      <th>Quantité</th>
+                      <th>Prix Vente Unitaire</th>
+                      <th>Coût Achat Unitaire</th>
+                      <th>Chiffre d'Affaires</th>
+                      <th>Coût Total</th>
+                      <th>Bénéfice Produit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="item in d.itemsList" :key="item.name + item.variant">
+                      <td><b>{{ item.name }}</b> <small class="text-muted" v-if="item.variant">({{ item.variant }})</small></td>
+                      <td><b>{{ item.qty }}</b></td>
+                      <td>{{ money(item.unitPrice) }}</td>
+                      <td class="text-muted">{{ money(item.unitCost) }}</td>
+                      <td>{{ money(item.totalRev) }}</td>
+                      <td class="text-muted">{{ money(item.totalCost) }}</td>
+                      <td>
+                        <b :class="item.profit >= 0 ? 'text-green' : 'text-danger'">
+                          {{ item.profit >= 0 ? '+' : '' }}{{ money(item.profit) }}
+                        </b>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+          </div>
+          <div v-else class="empty">Aucune vente ou donnée trouvée pour cette période.</div>
+        </div>
+
+        <!-- Top Profitable Products Ranking -->
+        <div class="panel top-products-panel">
+          <div class="panel-title">
+            <div>
+              <h2>Top 10 Produits les Plus Rentables</h2>
+              <p>Classement des articles ayant généré le plus de bénéfice net sur la période sélectionnée</p>
+            </div>
+          </div>
+          <div v-if="topProfitableProducts.length" class="table top-products-table">
+            <div class="table-head">
+              <span>Rang & Produit</span>
+              <span>Catégorie</span>
+              <span>Quantité Vendue</span>
+              <span>Chiffre d'Affaires</span>
+              <span>Coût d'Achat</span>
+              <span>Bénéfice Généré</span>
+              <span>Marge %</span>
+            </div>
+            <div v-for="(p, index) in topProfitableProducts.slice(0, 10)" :key="p.id" class="top-product-row">
+              <span class="rank-cell">
+                <b class="rank-badge">#{{ index + 1 }}</b>
+                <b>{{ p.name }}</b>
+              </span>
+              <span>{{ p.category }}</span>
+              <span><b>{{ p.qty }}</b> unités</span>
+              <span>{{ money(p.revenue) }}</span>
+              <span class="text-muted">{{ money(p.cost) }}</span>
+              <span>
+                <strong class="profit-pill-success">+{{ money(p.profit) }}</strong>
+              </span>
+              <span><b>{{ p.margin }} %</b></span>
+            </div>
+          </div>
+          <div v-else class="empty">Aucun produit vendu sur cette période.</div>
+        </div>
+      </section>
+
       <!-- Settings View -->
       <section v-else-if="shop.active==='settings'" class="page">
         <div class="page-head">
@@ -912,8 +1498,21 @@ onMounted(async () => {
           <button class="icon" @click="mobileCartSheet = false"><X/></button>
         </div>
         <div class="cart-lines">
-          <div v-for="line in shop.cart" :key="line.variantId">
-            <span><b>{{line.name}}</b><small>{{line.variant}} · {{money(line.price)}}</small></span>
+          <div v-for="line in shop.cart" :key="line.variantId" class="cart-line-item">
+            <div class="cart-line-info">
+              <b>{{line.name}}</b>
+              <small v-if="line.variant" style="display:block; color:#71717a;">{{line.variant}}</small>
+              <div class="cart-line-price-edit">
+                <span>Prix unitaire:</span>
+                <input
+                  type="number"
+                  min="0"
+                  v-model.number="line.price"
+                  class="inline-price-input"
+                  title="Modifier le prix de vente de cet article"
+                /> MAD
+              </div>
+            </div>
             <div class="quantity">
               <button type="button" @click="shop.decrementCartLine(line)"><Minus :size="13"/></button>
               <b>{{line.quantity}}</b>
@@ -943,14 +1542,29 @@ onMounted(async () => {
           </div>
           <button type="button" class="icon" @click="productModal=false"><X/></button>
         </div>
-        <label>Nom du produit<input v-model="draft.name" autofocus required/></label>
+        <label>Nom du produit<input v-model="draft.name" @input="onProductNameInput" autofocus required placeholder="Ex: T-Shirt Premium Cotton"/></label>
         <div class="two">
-          <label>SKU<input v-model="draft.sku"/></label>
-          <label>Code-barres<input v-model="draft.barcode"/></label>
+          <label>SKU (Auto-généré)
+            <div style="display:flex; gap:6px;">
+              <input v-model="draft.sku" placeholder="Ex: TSH-8492"/>
+              <button type="button" class="quiet" style="padding:4px 8px; font-size:11px; white-space:nowrap;" @click="draft.sku = generateAutoSku(draft.name)" title="Regénérer SKU">⚡ Auto</button>
+            </div>
+          </label>
+          <label>Code-barres (Auto-généré)
+            <div style="display:flex; gap:6px;">
+              <input v-model="draft.barcode" placeholder="Ex: 30000001"/>
+              <button type="button" class="quiet" style="padding:4px 8px; font-size:11px; white-space:nowrap;" @click="draft.barcode = generateAutoBarcode()" title="Regénérer Code-barres">⚡ Auto</button>
+            </div>
+          </label>
         </div>
         <div class="two">
-          <label>Catégorie<input v-model="draft.category"/></label>
-          <label>Marque<input v-model="draft.brand"/></label>
+          <label>Catégorie (Auto-détectée)
+            <input v-model="draft.category" list="category-suggestions" placeholder="Ex: Textile"/>
+            <datalist id="category-suggestions">
+              <option v-for="cat in Array.from(new Set(['Textile', 'Accessoires', 'Chaussures', 'Beauté & Cosmétique', 'Électronique', 'Général', ...shop.products.map(p => p.category)]))" :key="cat" :value="cat" />
+            </datalist>
+          </label>
+          <label>Marque<input v-model="draft.brand" placeholder="Ex: Alpha"/></label>
         </div>
         <div class="two">
           <label>Prix de vente (MAD)<input v-model.number="draft.price" type="number" min="0" required/></label>
@@ -998,26 +1612,107 @@ onMounted(async () => {
     <div v-if="checkoutModal" class="overlay checkout-overlay" @click.self="checkoutModal=false">
       <form class="modal order-form" @submit.prevent="submitOrder">
         <div class="modal-head">
-          <div><p class="eyebrow">FINALISER LA COMMANDE</p><h2>Livraison & paiement</h2></div>
+          <div><p class="eyebrow">FINALISER LA COMMANDE</p><h2>Paiement & type de vente</h2></div>
           <button type="button" class="icon" @click="checkoutModal=false"><X/></button>
         </div>
+
+        <!-- Mode de Vente: Online vs Sur Place / Offline -->
+        <div class="sale-type-selector">
+          <label class="eyebrow" style="margin-bottom:8px; display:block;">TYPE DE VENTE</label>
+          <div class="sale-type-buttons">
+            <button
+              type="button"
+              class="sale-type-btn"
+              :class="{ active: order.type === 'online' }"
+              @click="setSaleType('online')"
+            >
+              🌐 Vente en Ligne (Ozon Express / Livraison)
+            </button>
+            <button
+              type="button"
+              class="sale-type-btn"
+              :class="{ active: order.type === 'offline' }"
+              @click="setSaleType('offline')"
+            >
+              🏪 Client au Magasin (Sur Place / Direct)
+            </button>
+          </div>
+        </div>
+
         <div class="checkout-summary">
           <span>Sous-total <b>{{money(shop.cartTotal)}}</b></span>
           <span>Total à payer <strong>{{money(orderTotal)}}</strong></span>
         </div>
+
+        <!-- Articles au Panier & Prix Vente Modifiable -->
+        <div class="checkout-items-preview">
+          <label class="eyebrow" style="margin-bottom:8px; display:block;">PRIX DE VENTE PAR ARTICLE (NÉGOCIABLE / MODIFIABLE)</label>
+          <div v-for="line in shop.cart" :key="line.variantId" class="checkout-item-row">
+            <span>
+              <b>{{line.name}}</b> <small v-if="line.variant">({{line.variant}})</small>
+              <small style="display:block; color:#6b7280;">Qté: {{line.quantity}} · Total: <b>{{money(line.price * line.quantity)}}</b></small>
+            </span>
+            <div class="inline-price-box">
+              <span style="font-size:11px; color:#6b7280;">Prix unitaire:</span>
+              <input
+                type="number"
+                v-model.number="line.price"
+                min="0"
+                class="inline-price-input"
+                title="Modifier le prix de vente pour cet article"
+              /> MAD
+            </div>
+          </div>
+        </div>
+
         <div class="two">
           <label>Réduction (MAD)<input v-model.number="order.discount" type="number" min="0"/></label>
-          <label>Prix de livraison (MAD)<input v-model.number="order.shipping" type="number" min="0"/></label>
+          <label v-if="order.type === 'online'">Prix de livraison (MAD)<input v-model.number="order.shipping" type="number" min="0"/></label>
         </div>
+
+        <!-- Section Règlement & Crédit Client -->
+        <div class="payment-credit-card">
+          <div class="two">
+            <label>Montant Payé par le Client (MAD)
+              <input
+                type="number"
+                v-model.number="order.paidAmount"
+                :placeholder="orderTotal.toString()"
+                min="0"
+              />
+            </label>
+            <label>Reste à payer / Crédit (MAD)
+              <input
+                type="number"
+                :value="remainingBalance"
+                readonly
+                style="background: #f4f4f5; font-weight: 700;"
+                :style="{ color: remainingBalance > 0 ? '#dc2626' : '#16a34a' }"
+              />
+            </label>
+          </div>
+          <div v-if="remainingBalance > 0" class="credit-warning-badge danger">
+            ⚠️ Attention : Le client aura un reste à payer de <b>{{ money(remainingBalance) }}</b> (Crédit / كاندسالوه)
+          </div>
+          <div v-else class="credit-warning-badge success">
+            ✓ Payé en totalité (0 MAD restant)
+          </div>
+        </div>
+
+        <!-- Customer Information Section -->
         <div class="section-line customer-title">
-          <b>Informations du client</b>
-          <label class="switch"><input v-model="order.sendOzon" type="checkbox"/> Créer un colis Ozon Express</label>
+          <b>Informations du client {{ order.type === 'offline' ? '(Magasin / Sur Place)' : '(Livraison)' }}</b>
+          <label v-if="order.type === 'online'" class="switch">
+            <input v-model="order.sendOzon" type="checkbox"/> Créer un colis Ozon Express
+          </label>
         </div>
+
         <div class="two">
-          <label>Nom complet<input v-model="order.customer.name" placeholder="Mohammed Alami" :required="order.sendOzon"/></label>
-          <label>Téléphone<input v-model="order.customer.phone" placeholder="0612345678" :required="order.sendOzon"/></label>
+          <label>Nom complet<input v-model="order.customer.name" :placeholder="order.type==='offline' ? 'Client Comptoir (Optionnel)' : 'Mohammed Alami'" :required="order.sendOzon && order.type === 'online'"/></label>
+          <label>Téléphone<input v-model="order.customer.phone" placeholder="0612345678" :required="order.sendOzon && order.type === 'online'"/></label>
         </div>
-        <div class="two">
+
+        <div v-if="order.type === 'online'" class="two">
           <div class="city-picker-container">
             <label>Ville de livraison (Ozon Express)
               <input
@@ -1026,7 +1721,7 @@ onMounted(async () => {
                 @input="onCityInput"
                 @focus="citySearchOpen = true"
                 @blur="setTimeout(() => { citySearchOpen = false }, 250)"
-                :required="order.sendOzon"
+                :required="order.sendOzon && order.type === 'online'"
                 autocomplete="off"
               />
             </label>
@@ -1045,10 +1740,11 @@ onMounted(async () => {
               </div>
             </div>
           </div>
-          <label>Adresse complète<input v-model="order.customer.address" placeholder="123 Rue Hassan II, Quartier Maarif" :required="order.sendOzon"/></label>
+          <label>Adresse complète<input v-model="order.customer.address" placeholder="123 Rue Hassan II, Quartier Maarif" :required="order.sendOzon && order.type === 'online'"/></label>
         </div>
-        <label>Note de livraison<input v-model="order.customer.note" placeholder="Appeler avant livraison"/></label>
-        <div v-if="order.sendOzon" class="ozon-settings">
+        <label v-if="order.type === 'online'">Note de livraison<input v-model="order.customer.note" placeholder="Appeler avant livraison"/></label>
+
+        <div v-if="order.sendOzon && order.type === 'online'" class="ozon-settings">
           <p class="eyebrow">OZON EXPRESS</p>
           <div class="two">
             <label>ID Client Ozon<input v-model="order.ozon.customerId" required/></label>
@@ -1080,7 +1776,7 @@ onMounted(async () => {
         </div>
         <div class="modal-actions">
           <button type="button" class="quiet" @click="checkoutModal=false">Retour</button>
-          <button class="primary" :disabled="submitting">{{submitting?'Enregistrement…':order.sendOzon?'Créer la vente et le colis':'Finaliser la vente'}}</button>
+          <button class="primary" :disabled="submitting">{{submitting?'Enregistrement…':(order.sendOzon && order.type==='online')?'Créer la vente et le colis':'Finaliser la vente'}}</button>
         </div>
       </form>
     </div>
