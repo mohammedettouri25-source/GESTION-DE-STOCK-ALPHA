@@ -272,6 +272,18 @@ function sendWhatsAppCustomerMessage(customer) {
   window.open(url, '_blank')
 }
 
+function sendWhatsAppCreditReminder(customer) {
+  const phone = formatWhatsAppPhone(customer?.phone)
+  if (!phone) return shop.notify('Numéro de téléphone non valide')
+  const balance = Math.max(0, (Number(customer.totalPurchases) || 0) - (Number(customer.totalPaid) || 0))
+  if (balance <= 0) return shop.notify('Ce client n\'a aucun crédit en cours')
+  
+  const message = `👋 السلام عليكم ${customer.name || ''}،\n\nكنتمناو تكون بيخير.\n\nمن أجل مراجعة الحسابات، كنذكروك باللي باقي عندك واحد المبلغ متبقي ديال *${balance} MAD* من المشتريات ديالك فـ متجر *${settings.value.business || 'Alpha Shop'}*.\n\n📊 تفاصيل الحساب:\n- مجموع المعاملات: ${customer.totalPurchases} MAD\n- المبلغ المدفوع: ${customer.totalPaid} MAD\n- المبلغ المتبقي: *${balance} MAD*\n\nشكراً بزاف على ثقتك وتفهمك! 🙏✨`
+  
+  const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`
+  window.open(url, '_blank')
+}
+
 function parseProductFromText(promptText) {
   const text = promptText.trim()
   if (!text) return null
@@ -1842,6 +1854,9 @@ onMounted(async () => {
                 </button>
                 <button v-if="shop.active === 'customers' && (Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) > 0" class="quiet" style="color:#d97706; font-weight:600; font-size:12px; border:1px solid #fef08a; background:#fefce8; padding:4px 8px; border-radius:6px;" @click.stop="openPayCustomerDebt(person)" title="Encaisser le crédit client">
                   💰 Encaisser
+                </button>
+                <button v-if="shop.active === 'customers' && (Number(person.totalPurchases || 0) - Number(person.totalPaid || 0)) > 0" class="quiet" style="color:#2563eb; font-weight:600; font-size:12px; border:1px solid #bfdbfe; background:#eff6ff; padding:4px 8px; border-radius:6px; display:flex; gap:4px; align-items:center;" @click.stop="sendWhatsAppCreditReminder(person)" title="Envoyer un rappel de paiement sur WhatsApp">
+                  🔔 Relancer
                 </button>
                 <button v-if="person.phone" class="icon" style="color:#16a34a;" title="Contacter sur WhatsApp" @click.stop="sendWhatsAppCustomerMessage(person)">
                   <MessageCircle :size="16"/>
