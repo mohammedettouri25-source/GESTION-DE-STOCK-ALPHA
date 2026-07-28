@@ -397,7 +397,9 @@ export const useShop = defineStore('shop', {
           remainingBalance,
           customer: details.customer ? JSON.parse(JSON.stringify(details.customer)) : null,
           payment,
-          status: 'completed'
+          source: details.source || 'pos',
+          status: details.status || (details.source === 'storefront' ? 'unconfirmed' : 'completed'),
+          confirmed: details.source === 'storefront' ? false : true
         }
 
         // Clean sale object to prevent IndexedDB DataCloneError from Vue reactive proxies

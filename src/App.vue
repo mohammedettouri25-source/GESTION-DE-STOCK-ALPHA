@@ -1374,7 +1374,36 @@ function saveSettings() {
   }
   shop.notify('Réglages et Code PIN enregistrés')
 }
-function exportSales() { const rows = ['Numéro;Date;Total;Paiement;Client', ...shop.sales.map(s => `${s.number};${new Date(s.createdAt).toLocaleDateString('fr-MA')};${s.total};${s.payment};${s.customer?.name||'Comptoir'}`)]; const url = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement('a'); a.href = url; a.download = `rapport-ventes-${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url) }
+const unconfirmedStorefrontOrders = computed(() => {
+  return (shop.sales || []).filter(s => 
+    (s.source === 'storefront' || s.status === 'unconfirmed' || s.status === 'pending_confirmation') && 
+    s.status !== 'confirmée' && 
+    !s.confirmed
+  )
+})
+
+async function confirmStorefrontOrder(sale) {
+  const updated = {
+    ...sale,
+    status: 'confirmée',
+    confirmed: true
+  }
+  await shop.updateSale(updated)
+  shop.notify(`Commande ${sale.number} confirmée avec succès ✓`)
+}
+
+async function confirmAllStorefrontOrders() {
+  const list = [...unconfirmedStorefrontOrders.value]
+  for (const s of list) {
+    await confirmStorefrontOrder(s)
+  }
+  shop.notify(`Toutes les commandes du Matjer ont été confirmées (${list.length}) ✓`)
+}
+
+function markSaleConfirmed(sale) {
+  confirmStorefrontOrder(sale)
+}
+
 function openCheckout() { if (!shop.cart.length) return shop.notify('Ajoutez au moins un article au panier'); mobileCartSheet.value = false; checkoutModal.value = true }
 const orderTotal = computed(() => Math.max(0, shop.cartTotal - (Number(order.value.discount) || 0) + (Number(order.value.shipping) || 0)))
 
@@ -1564,6 +1593,7 @@ onMounted(async () => {
         <button v-for="[id,label,icon] in nav" :key="id" :class="{active:shop.active===id}" @click="navigate(id)">
           <component :is="icon" :size="18"/>{{label}}
           <span v-if="id==='products'&&shop.lowStock.length" class="badge">{{shop.lowStock.length}}</span>
+          <span v-if="id==='orders'&&unconfirmedStorefrontOrders.length" class="badge" style="background:#ea580c; color:#ffffff; font-weight:800;">⚡ {{unconfirmedStorefrontOrders.length}}</span>
         </button>
       </nav>
       <div class="side-bottom">
@@ -1841,16 +1871,68 @@ onMounted(async () => {
           <div><p class="eyebrow">SUIVI DES VENTES</p><h1>Commandes</h1></div>
           <button class="primary" @click="shop.active='pos'"><Plus :size="17"/> Nouvelle commande</button>
         </div>
+
+        <!-- Banner for Unconfirmed Storefront Orders -->
+        <div v-if="unconfirmedStorefrontOrders.length" style="background: linear-gradient(135deg, #fff7ed, #ffedd5); border: 2px solid #ea580c; border-radius: 16px; padding: 14px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; box-shadow: 0 4px 14px rgba(234, 88, 12, 0.15);">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:38px; height:38px; border-radius:10px; background:#ea580c; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:900;">⚡</div>
+            <div>
+              <h3 style="margin:0; font-size:14px; font-weight:800; color:#c2410c;">
+                {{ shop.language === 'ar' ? `هناك ${unconfirmedStorefrontOrders.length} طلبية جديدة من المتجر فـ انتظار تأكيدك!` : `${unconfirmedStorefrontOrders.length} nouvelle(s) commande(s) du Matjer en attente de confirmation !` }}
+              </h3>
+              <p style="margin:2px 0 0; font-size:11px; color:#ea580c;">
+                {{ shop.language === 'ar' ? 'قم بتأكيدها ليتم اعتمادها ومراجعة معلومات الزبون.' : 'Vérifiez les coordonnées puis cliquez sur Confirmer.' }}
+              </p>
+            </div>
+          </div>
+          <button class="primary" style="background:#ea580c; border:none; padding:8px 16px; font-weight:800; font-size:12px; cursor:pointer;" @click="confirmAllStorefrontOrders">
+            ✓ {{ shop.language === 'ar' ? 'تأكيد الكل' : 'Tout confirmer' }}
+          </button>
+        </div>
+
         <div class="panel orders-list">
           <div v-if="shop.sales.length" class="table">
-            <div class="order-row" v-for="sale in shop.sales" :key="sale.id">
-              <span><b>{{sale.number || '—'}}</b><small>{{sale.createdAt ? new Date(sale.createdAt).toLocaleString('fr-MA') : '—'}}</small></span>
-              <span><b>{{sale.customer?.name||'Vente comptoir'}}</b><small v-if="sale.shipment?.tracking">Ozon : {{sale.shipment.tracking}}</small></span>
+            <div 
+              class="order-row" 
+              v-for="sale in shop.sales" 
+              :key="sale.id"
+              :style="(sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed ? 'background-color: #fff7ed; border-left: 4px solid #ea580c;' : ''"
+            >
+              <span>
+                <b style="display:flex; align-items:center; gap:6px;">
+                  {{sale.number || '—'}}
+                  <span v-if="(sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed" style="font-size:10px; font-weight:900; background:#ea580c; color:#ffffff; padding:2px 8px; border-radius:10px; letter-spacing:0.5px;">
+                    ⚡ STOREFRONT (طلب من المتجر)
+                  </span>
+                  <span v-else-if="sale.source === 'storefront'" style="font-size:10px; font-weight:800; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:10px;">
+                    🛒 Matjer
+                  </span>
+                </b>
+                <small>{{sale.createdAt ? new Date(sale.createdAt).toLocaleString('fr-MA') : '—'}}</small>
+              </span>
+              <span>
+                <b>{{sale.customer?.name||'Vente comptoir'}}</b>
+                <small v-if="sale.customer?.phone" style="display:block; color:#475569;">📞 {{sale.customer.phone}} {{sale.customer?.city ? '· ' + sale.customer.city : ''}}</small>
+                <small v-if="sale.shipment?.tracking">Ozon : {{sale.shipment.tracking}}</small>
+              </span>
               <strong>{{money(sale.total)}}</strong>
               <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                <span v-if="sale.status==='confirmée'" class="badge-profit" style="background:#10b981; font-size:11px; padding:4px 8px;">
-                  🟢 {{ shop.language === 'ar' ? 'مؤكدة (WhatsApp)' : 'Confirmée (WhatsApp)' }}
+                <!-- UNCONFIRMED STOREFRONT ORDER CONFIRMATION BUTTON -->
+                <button
+                  v-if="(sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed"
+                  class="primary"
+                  style="background:#ea580c; border:none; padding:6px 12px; font-size:12px; font-weight:800; display:flex; gap:4px; align-items:center; box-shadow: 0 2px 8px rgba(234,88,12,0.3);"
+                  title="Confirmer la commande reçue du Matjer"
+                  @click="confirmStorefrontOrder(sale)"
+                >
+                  <CheckCircle2 :size="15"/> {{ shop.language === 'ar' ? 'تأكيد الطلبية (Confirmer)' : 'Confirmer la commande' }}
+                </button>
+
+                <!-- ALREADY CONFIRMED BADGE -->
+                <span v-else-if="sale.status==='confirmée' || sale.confirmed" class="badge-profit" style="background:#10b981; font-size:11px; padding:4px 8px; font-weight:800;">
+                  🟢 {{ shop.language === 'ar' ? 'مؤكدة' : 'Confirmée' }}
                 </span>
+
                 <button
                   v-else-if="sale.customer?.phone"
                   class="quiet"

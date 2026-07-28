@@ -449,7 +449,9 @@ async function submitOrder() {
       },
       shipping: shippingCost.value,
       discount: discountAmount.value,
-      paidAmount: 0
+      paidAmount: 0,
+      source: 'storefront',
+      status: 'unconfirmed'
     }
 
     const cartSnapshot = JSON.parse(JSON.stringify(shop.cart))
