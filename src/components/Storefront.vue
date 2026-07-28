@@ -260,13 +260,36 @@ function formatColorName(colorName) {
   return colorName
 }
 
-function openProductDetail(product) {
+const linkCopied = ref(false)
+
+function copyProductLink() {
+  if (!activeProduct.value) return
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://alphashop07.com'
+  const fullUrl = `${origin}/?product=${activeProduct.value.id}`
+  if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(fullUrl).then(() => {
+      linkCopied.value = true
+      shop.notify(currentLang.value === 'ar' ? 'تم نسخ رابط المنتج! 📋' : 'Lien produit copié ! 📋')
+      setTimeout(() => { linkCopied.value = false }, 3000)
+    }).catch(() => { shop.notify(fullUrl) })
+  } else {
+    shop.notify(fullUrl)
+  }
+}
+
+function openProductDetail(product, pushHistory = true) {
+  if (!product) return
   activeProduct.value = product
   selectedProductId.value = product.id
   selectedVariant.value = (product.variants && product.variants.find(v => v.stock > 0)) || product.variants?.[0] || null
   selectedColor.value = selectedVariant.value?.color || (product.variants?.[0]?.color || '')
   activeImageIndex.value = 0
   currentPage.value = 'product'
+  if (pushHistory && typeof window !== 'undefined') {
+    const url = new URL(window.location.href)
+    url.searchParams.set('product', product.id)
+    window.history.pushState({ productId: product.id }, '', url.pathname + url.search)
+  }
   if (typeof window !== 'undefined') {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -281,12 +304,39 @@ function onColorSelect(color) {
   }
 }
 
-function backToHome() {
+function backToHome(pushHistory = true) {
   currentPage.value = 'home'
   activeProduct.value = null
   selectedProductId.value = null
+  if (pushHistory && typeof window !== 'undefined') {
+    const url = new URL(window.location.href)
+    url.searchParams.delete('product')
+    window.history.pushState({}, '', url.pathname + (url.search || ''))
+  }
 }
 
+function _openProductFromUrl() {
+  if (typeof window === 'undefined') return
+  const pId = new URLSearchParams(window.location.search).get('product')
+  if (pId && Array.isArray(shop.products) && shop.products.length) {
+    const m = shop.products.find(p => String(p.id) === String(pId))
+    if (m) openProductDetail(m, false)
+  }
+}
+
+onMounted(() => {
+  _openProductFromUrl()
+  if (typeof window !== 'undefined') {
+    window.addEventListener('popstate', () => {
+      const pId = new URLSearchParams(window.location.search).get('product')
+      if (pId && Array.isArray(shop.products)) {
+        const m = shop.products.find(p => String(p.id) === String(pId))
+        if (m) { openProductDetail(m, false); return }
+      }
+      backToHome(false)
+    })
+  }
+})
 const relatedProducts = computed(() => {
   if (!activeProduct.value) return []
   return (shop.products || [])
@@ -788,6 +838,15 @@ function getProductImagesList(product) {
             >
               <ShoppingBag :size="16" />
               <span>{{ currentLang === 'ar' ? 'إضافة إلى السلة' : 'Ajouter au Panier' }}</span>
+            </button>
+
+            <button 
+              @click="copyProductLink"
+              class="share-link-btn"
+              :title="currentLang === 'ar' ? 'نسخ رابط هذا المنتج' : 'Copier le lien direct'"
+            >
+              <Share2 :size="15" />
+              <span>{{ linkCopied ? (currentLang === 'ar' ? 'تم نسخ الرابط! 📋' : 'Lien copié! 📋') : (currentLang === 'ar' ? 'نسخ رابط المنتج 🔗' : 'Copier le lien 🔗') }}</span>
             </button>
           </div>
 
@@ -1980,6 +2039,25 @@ function getProductImagesList(product) {
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+.share-link-btn {
+  width: 100%;
+  padding: 11px 0;
+  background: #ffffff;
+  color: #0071e3;
+  border: 1.5px dashed #0071e3;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+.share-link-btn:hover {
+  background: #f0f7ff;
 }
 
 .specs-accordion {
