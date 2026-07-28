@@ -586,9 +586,14 @@ export const useShop = defineStore('shop', {
     },
 
     async queue(table, payload) {
-      const cleanPayload = payload ? JSON.parse(JSON.stringify(payload)) : null
-      await localDb.queue.add({ table, payload: cleanPayload, createdAt: new Date().toISOString() })
-      if (this.online) this.sync()
+      try {
+        const cleanPayload = payload ? JSON.parse(JSON.stringify(payload)) : null
+        await localDb.queue.add({ table, payload: cleanPayload, createdAt: new Date().toISOString() })
+        if (this.online) this.sync()
+      } catch (e) {
+        console.error(`FAILED AT localDb.queue.add for table ${table}! Payload:`, payload)
+        throw new Error(`localDb.queue.add (${table}): ${e.message}`)
+      }
     },
 
     async sync() {
