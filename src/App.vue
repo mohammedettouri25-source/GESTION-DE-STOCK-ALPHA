@@ -1401,15 +1401,6 @@ async function confirmAllStorefrontOrders() {
 }
 
 
-async function confirmDeleteSale(sale) {
-  if (!sale || !sale.id) return
-  const msg = shop.language === 'ar' 
-    ? `هل أنت تأكيد من إلغاء/حذف الطلبية ${sale.number || ''} وتأكيد استرجاع المخزون؟`
-    : `Voulez-vous vraiment supprimer la commande ${sale.number || ''} et réintégrer le stock ?`
-  if (confirm(msg)) {
-    await shop.removeSale(sale.id, true)
-  }
-}
 
 function openCheckout() { if (!shop.cart.length) return shop.notify('Ajoutez au moins un article au panier'); mobileCartSheet.value = false; checkoutModal.value = true }
 const orderTotal = computed(() => Math.max(0, shop.cartTotal - (Number(order.value.discount) || 0) + (Number(order.value.shipping) || 0)))
