@@ -500,6 +500,7 @@ export const useShop = defineStore('shop', {
     },
 
     async removeSale(saleId, restoreStock = true) {
+      console.log("HELLO I AM THE REAL REMOVESALE PLEASE FIND ME IN THE BUNDLE");
       try {
         const targetId = typeof saleId === 'object' ? (saleId.id || saleId._id) : saleId
         const index = this.sales.findIndex(s => s.id === targetId)

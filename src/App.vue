@@ -1400,9 +1400,6 @@ async function confirmAllStorefrontOrders() {
   shop.notify(`Toutes les commandes du Matjer ont été confirmées (${list.length}) ✓`)
 }
 
-function markSaleConfirmed(sale) {
-  confirmStorefrontOrder(sale)
-}
 
 async function confirmDeleteSale(sale) {
   if (!sale || !sale.id) return
