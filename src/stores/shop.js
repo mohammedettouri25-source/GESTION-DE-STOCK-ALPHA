@@ -409,15 +409,15 @@ export const useShop = defineStore('shop', {
         for (const item of sale.items) {
           const pIdx = this.products.findIndex(x => x.id === item.productId)
           if (pIdx < 0) throw new Error(`Produit introuvable: ${item.name}`)
-          const p = this.products[pIdx]
-          const vIdx = p.variants.findIndex(x => x.id === item.variantId)
+          const rawProduct = JSON.parse(JSON.stringify(this.products[pIdx]))
+          const vIdx = Array.isArray(rawProduct.variants) ? rawProduct.variants.findIndex(x => x.id === item.variantId) : -1
           if (vIdx < 0) throw new Error(`Variante introuvable pour: ${item.name}`)
 
           // Immutable update to trigger reactivity
-          const updatedVariants = p.variants.map((v, i) =>
-            i === vIdx ? { ...v, stock: v.stock - item.quantity } : { ...v }
+          const updatedVariants = rawProduct.variants.map((v, i) =>
+            i === vIdx ? { ...v, stock: Math.max(0, (Number(v.stock) || 0) - item.quantity) } : { ...v }
           )
-          const updatedProduct = JSON.parse(JSON.stringify({ ...p, variants: updatedVariants }))
+          const updatedProduct = JSON.parse(JSON.stringify({ ...rawProduct, variants: updatedVariants }))
           await localDb.products.put(updatedProduct)
           await this.queue('products', updatedProduct)
 
@@ -425,7 +425,7 @@ export const useShop = defineStore('shop', {
 
           await localDb.movements.add(JSON.parse(JSON.stringify({
             id: crypto.randomUUID(),
-            productId: p.id,
+            productId: rawProduct.id,
             type: 'sale',
             quantity: -item.quantity,
             createdAt: sale.createdAt
@@ -468,23 +468,24 @@ export const useShop = defineStore('shop', {
 
     async removeSale(saleId, restoreStock = true) {
       try {
-        const index = this.sales.findIndex(s => s.id === saleId)
+        const targetId = typeof saleId === 'object' ? (saleId.id || saleId._id) : saleId
+        const index = this.sales.findIndex(s => s.id === targetId)
         if (index < 0) return
 
-        const sale = this.sales[index]
+        const sale = JSON.parse(JSON.stringify(this.sales[index]))
 
         // Restituer le stock en cas de retour / annulation
         if (restoreStock && Array.isArray(sale.items)) {
           for (const item of sale.items) {
             const pIdx = this.products.findIndex(x => x.id === item.productId || x.sku === item.sku)
             if (pIdx >= 0) {
-              const p = this.products[pIdx]
-              const vIdx = p.variants.findIndex(x => x.id === item.variantId)
+              const rawProduct = JSON.parse(JSON.stringify(this.products[pIdx]))
+              const vIdx = Array.isArray(rawProduct.variants) ? rawProduct.variants.findIndex(x => x.id === item.variantId) : -1
               if (vIdx >= 0) {
-                const updatedVariants = p.variants.map((v, i) =>
-                  i === vIdx ? { ...v, stock: v.stock + (Number(item.quantity) || 1) } : { ...v }
+                const updatedVariants = rawProduct.variants.map((v, i) =>
+                  i === vIdx ? { ...v, stock: (Number(v.stock) || 0) + (Number(item.quantity) || 1) } : { ...v }
                 )
-                const updatedProduct = JSON.parse(JSON.stringify({ ...p, variants: updatedVariants }))
+                const updatedProduct = JSON.parse(JSON.stringify({ ...rawProduct, variants: updatedVariants }))
                 await localDb.products.put(updatedProduct)
                 await this.queue('products', updatedProduct)
 
@@ -492,7 +493,7 @@ export const useShop = defineStore('shop', {
 
                 await localDb.movements.add(JSON.parse(JSON.stringify({
                   id: crypto.randomUUID(),
-                  productId: p.id,
+                  productId: rawProduct.id,
                   type: 'return',
                   quantity: Number(item.quantity) || 1,
                   createdAt: new Date().toISOString()
@@ -507,19 +508,19 @@ export const useShop = defineStore('shop', {
           await this.revertCustomerCredit(sale.customer, sale.remainingBalance, sale.number)
         }
 
-        await localDb.sales.delete(saleId)
+        await localDb.sales.delete(targetId)
         this.sales.splice(index, 1)
 
-        await this.queue('sales', { id: saleId, deleted: true })
+        await this.queue('sales', { id: targetId, deleted: true })
 
         if (supabase) {
-          supabase.from('sales').delete().eq('id', saleId).then(() => {}).catch(() => {})
+          supabase.from('sales').delete().eq('id', targetId).then(() => {}).catch(() => {})
         }
 
         this.notify(restoreStock ? 'Commande supprimée & stock réintégré ✓' : 'Commande supprimée ✓')
       } catch (error) {
         console.error('removeSale error:', error)
-        this.notify(`Erreur : ${error.message}`)
+        this.notify(`Erreur : ${error.message || error}`)
       }
     },
 
