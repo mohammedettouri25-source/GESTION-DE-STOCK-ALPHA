@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useShop } from '../stores/shop'
 import { OZON_CITIES } from '../services/ozonCities'
 import { 
@@ -317,18 +317,26 @@ function backToHome(pushHistory = true) {
 
 function _openProductFromUrl() {
   if (typeof window === 'undefined') return
-  const pId = new URLSearchParams(window.location.search).get('product')
+  const searchParams = new URLSearchParams(window.location.search)
+  const pId = searchParams.get('product') || searchParams.get('p') || window.location.hash.replace(/^#product-/, '').replace(/^#/, '')
   if (pId && Array.isArray(shop.products) && shop.products.length) {
     const m = shop.products.find(p => String(p.id) === String(pId))
     if (m) openProductDetail(m, false)
   }
 }
 
+watch(() => shop.products, (prods) => {
+  if (Array.isArray(prods) && prods.length > 0 && currentPage.value !== 'product') {
+    _openProductFromUrl()
+  }
+}, { immediate: true, deep: true })
+
 onMounted(() => {
   _openProductFromUrl()
   if (typeof window !== 'undefined') {
     window.addEventListener('popstate', () => {
-      const pId = new URLSearchParams(window.location.search).get('product')
+      const searchParams = new URLSearchParams(window.location.search)
+      const pId = searchParams.get('product') || searchParams.get('p') || window.location.hash.replace(/^#product-/, '').replace(/^#/, '')
       if (pId && Array.isArray(shop.products)) {
         const m = shop.products.find(p => String(p.id) === String(pId))
         if (m) { openProductDetail(m, false); return }
@@ -2573,5 +2581,121 @@ function getProductImagesList(product) {
 .morocco-badge {
   font-weight: 700;
   color: #a1a1a6;
+}
+
+/* MOBILE RESPONSIVENESS ENHANCEMENTS FOR SINGLE PRODUCT PAGE */
+@media (max-width: 640px) {
+  .single-product-container {
+    padding: 10px 12px 40px;
+  }
+  .breadcrumb {
+    font-size: 11px;
+    gap: 4px;
+    margin-bottom: 14px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .breadcrumb .current {
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .product-detail-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .main-display-box {
+    border-radius: 16px;
+    aspect-ratio: 1 / 1;
+    max-height: 360px;
+    width: 100%;
+  }
+  .thumbnails-bar {
+    gap: 6px;
+    padding-bottom: 4px;
+  }
+  .thumb-img {
+    width: 54px;
+    height: 66px;
+    border-radius: 10px;
+  }
+  .purchase-card-col {
+    padding: 16px 14px;
+    border-radius: 18px;
+    gap: 14px;
+  }
+  .product-info-box h1 {
+    font-size: 18px;
+    line-height: 1.35;
+    margin: 2px 0 0;
+  }
+  .price-large {
+    font-size: 22px;
+    margin-top: 4px;
+  }
+  .price-large small {
+    font-size: 14px;
+  }
+  .color-selector-box label,
+  .size-selector-box label {
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+  .swatches-flex-group {
+    gap: 6px;
+  }
+  .color-swatch-chip {
+    padding: 5px 11px;
+    font-size: 11px;
+    border-radius: 10px;
+    gap: 6px;
+  }
+  .swatch-color-dot {
+    width: 14px;
+    height: 14px;
+  }
+  .size-buttons {
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .size-btn {
+    padding: 7px 14px;
+    font-size: 12px;
+    border-radius: 10px;
+    min-width: 44px;
+  }
+  .cta-buttons {
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .buy-now-btn {
+    padding: 13px 0;
+    font-size: 13px;
+    border-radius: 12px;
+  }
+  .add-cart-btn {
+    padding: 11px 0;
+    font-size: 12px;
+    border-radius: 12px;
+  }
+  .share-link-btn {
+    padding: 10px 0;
+    font-size: 12px;
+    border-radius: 12px;
+  }
+  .specs-accordion {
+    margin-top: 10px;
+    gap: 8px;
+  }
+  .spec-row {
+    font-size: 11px;
+    padding: 10px 12px;
+    border-radius: 12px;
+  }
 }
 </style>
