@@ -17,8 +17,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const { action, parcel, trackingNumber, customerId: bodyCustomerId, apiKey: bodyApiKey } = req.body || {}
-  const customerId = bodyCustomerId || process.env.VITE_OZON_CUSTOMER_ID || process.env.OZON_CUSTOMER_ID || '89381'
-  const apiKey = bodyApiKey || process.env.VITE_OZON_API_KEY || process.env.OZON_API_KEY || 'db4545-4ede23-78ef27-868f4a-fa5359'
+  const customerId = bodyCustomerId || process.env.VITE_OZON_CUSTOMER_ID || process.env.OZON_CUSTOMER_ID || ''
+  const apiKey = bodyApiKey || process.env.VITE_OZON_API_KEY || process.env.OZON_API_KEY || ''
 
   if (!customerId || !apiKey) {
     return res.status(400).json({ error: 'ID Client et clé API Ozon Express non configurés sur le serveur' })

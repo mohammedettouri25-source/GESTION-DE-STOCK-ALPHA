@@ -23,8 +23,8 @@ const order = ref({
   customer: { name: '', phone: '', cityId: '', city: '', address: '', note: '' },
   sendOzon: true,
   ozon: {
-    customerId: localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '89381',
-    apiKey: localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || 'db4545-4ede23-78ef27-868f4a-fa5359',
+    customerId: localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '',
+    apiKey: localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || '',
     declaredValue: '',
     open: '1',
     fragile: '0',
@@ -1411,8 +1411,8 @@ async function submitOrder() {
           cityIdParam = '2165'
         }
 
-        const validId = (o.customerId && /^\d+$/.test(String(o.customerId).trim())) ? String(o.customerId).trim() : (import.meta.env.VITE_OZON_CUSTOMER_ID || '89381')
-        const validKey = (o.apiKey && String(o.apiKey).trim().length > 5) ? String(o.apiKey).trim() : (import.meta.env.VITE_OZON_API_KEY || 'db4545-4ede23-78ef27-868f4a-fa5359')
+        const validId = (o.customerId && /^\d+$/.test(String(o.customerId).trim())) ? String(o.customerId).trim() : (import.meta.env.VITE_OZON_CUSTOMER_ID || '')
+        const validKey = (o.apiKey && String(o.apiKey).trim().length > 5) ? String(o.apiKey).trim() : (import.meta.env.VITE_OZON_API_KEY || '')
 
         const response = await createOzonParcel({
           customerId: validId,
