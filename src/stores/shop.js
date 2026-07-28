@@ -418,17 +418,18 @@ export const useShop = defineStore('shop', {
             i === vIdx ? { ...v, stock: v.stock - item.quantity } : { ...v }
           )
           const updatedProduct = JSON.parse(JSON.stringify({ ...p, variants: updatedVariants }))
-          this.products.splice(pIdx, 1, updatedProduct)
-
           await localDb.products.put(updatedProduct)
           await this.queue('products', updatedProduct)
-          await localDb.movements.add({
+
+          this.products.splice(pIdx, 1, updatedProduct)
+
+          await localDb.movements.add(JSON.parse(JSON.stringify({
             id: crypto.randomUUID(),
             productId: p.id,
             type: 'sale',
             quantity: -item.quantity,
             createdAt: sale.createdAt
-          })
+          })))
         }
 
         await localDb.sales.add(sale)
@@ -484,17 +485,18 @@ export const useShop = defineStore('shop', {
                   i === vIdx ? { ...v, stock: v.stock + (Number(item.quantity) || 1) } : { ...v }
                 )
                 const updatedProduct = JSON.parse(JSON.stringify({ ...p, variants: updatedVariants }))
-                this.products.splice(pIdx, 1, updatedProduct)
-
                 await localDb.products.put(updatedProduct)
                 await this.queue('products', updatedProduct)
-                await localDb.movements.add({
+
+                this.products.splice(pIdx, 1, updatedProduct)
+
+                await localDb.movements.add(JSON.parse(JSON.stringify({
                   id: crypto.randomUUID(),
                   productId: p.id,
                   type: 'return',
                   quantity: Number(item.quantity) || 1,
                   createdAt: new Date().toISOString()
-                })
+                })))
               }
             }
           }
