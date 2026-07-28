@@ -5,9 +5,122 @@ import { supabase } from '../lib/supabase'
 let realtimeChannel = null
 
 const seed = [
-  { id:'p1', name:'T-shirt Essential', sku:'TS-001', barcode:'3000001', category:'Textile', brand:'Alpha', price:149, purchasePrice:72, variants:[{id:'v1',color:'Noir',size:'S',stock:10,min:3,barcode:'30000011'},{id:'v2',color:'Noir',size:'M',stock:15,min:3,barcode:'30000012'},{id:'v3',color:'Blanc',size:'M',stock:6,min:3,barcode:'30000013'}] },
-  { id:'p2', name:'Casquette Logo', sku:'CP-002', barcode:'3000002', category:'Accessoires', brand:'Alpha', price:99, purchasePrice:40, variants:[{id:'v4',color:'Noir',size:'Unique',stock:4,min:3,barcode:'30000021'}] },
-  { id:'p3', name:'Hoodie Studio', sku:'HD-003', barcode:'3000003', category:'Textile', brand:'Alpha', price:349, purchasePrice:165, variants:[{id:'v5',color:'Gris',size:'L',stock:12,min:3,barcode:'30000031'}] }
+  { 
+    id: 'b1000000-0000-4000-8000-000000000001', 
+    name: 'Chemise Ouverte Streetwear & Tank', 
+    sku: 'CH-001', 
+    barcode: '3000001', 
+    category: 'Chemises', 
+    brand: 'Alpha', 
+    price: 299, 
+    purchasePrice: 140, 
+    image: '/hero-slider-2.jpg',
+    images: [
+      '/hero-slider-2.jpg',
+      '/hero-slider-3.jpg',
+      '/hero-slider-1.jpg'
+    ],
+    variants: [
+      { id: 'c1000000-0000-4000-8000-000000000001', color: 'Bleu Ciel', size: 'M', stock: 12, min: 3, barcode: '30000011' },
+      { id: 'c1000000-0000-4000-8000-000000000002', color: 'Bleu Ciel', size: 'L', stock: 18, min: 3, barcode: '30000012' },
+      { id: 'c1000000-0000-4000-8000-000000000003', color: 'Blanc', size: 'XL', stock: 8, min: 3, barcode: '30000013' }
+    ] 
+  },
+  { 
+    id: 'b1000000-0000-4000-8000-000000000002', 
+    name: 'T-Shirt Heavyweight Brown & Shorts', 
+    sku: 'EN-002', 
+    barcode: '3000002', 
+    category: 'Ensembles', 
+    brand: 'Alpha', 
+    price: 399, 
+    purchasePrice: 180, 
+    image: '/hero-slider-1.jpg',
+    images: [
+      '/hero-slider-1.jpg',
+      '/hero-slider-2.jpg'
+    ],
+    variants: [
+      { id: 'c1000000-0000-4000-8000-000000000004', color: 'Marrow Brown', size: 'M', stock: 15, min: 3, barcode: '30000021' },
+      { id: 'c1000000-0000-4000-8000-000000000005', color: 'Marrow Brown', size: 'L', stock: 20, min: 3, barcode: '30000022' },
+      { id: 'c1000000-0000-4000-8000-000000000006', color: 'Beige', size: 'L', stock: 10, min: 3, barcode: '30000023' }
+    ] 
+  },
+  { 
+    id: 'b1000000-0000-4000-8000-000000000003', 
+    name: 'Chemise Bleu Oxford & Denim Shorts', 
+    sku: 'TS-003', 
+    barcode: '3000003', 
+    category: 'Chemises', 
+    brand: 'Alpha', 
+    price: 349, 
+    purchasePrice: 150, 
+    image: '/hero-slider-3.jpg',
+    images: [
+      '/hero-slider-3.jpg',
+      '/hero-slider-2.jpg'
+    ],
+    variants: [
+      { id: 'c1000000-0000-4000-8000-000000000007', color: 'Bleu Denim', size: 'S', stock: 10, min: 3, barcode: '30000031' },
+      { id: 'c1000000-0000-4000-8000-000000000008', color: 'Bleu Denim', size: 'M', stock: 25, min: 3, barcode: '30000032' },
+      { id: 'c1000000-0000-4000-8000-000000000009', color: 'Bleu Denim', size: 'L', stock: 14, min: 3, barcode: '30000033' }
+    ] 
+  },
+  { 
+    id: 'b1000000-0000-4000-8000-000000000004', 
+    name: 'Pantalon Cargo Relaxed Fit Tactical', 
+    sku: 'PC-004', 
+    barcode: '3000004', 
+    category: 'Pantalons & Cargos', 
+    brand: 'Alpha', 
+    price: 349, 
+    purchasePrice: 160, 
+    image: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=1000&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=1000&q=80',
+      'https://images.unsplash.com/photo-1517445312882-bc9910d016b7?auto=format&fit=crop&w=1000&q=80'
+    ],
+    variants: [
+      { id: 'c1000000-0000-4000-8000-000000000010', color: 'Noir Tactical', size: 'M', stock: 12, min: 3, barcode: '30000041' },
+      { id: 'c1000000-0000-4000-8000-000000000011', color: 'Khaki Désert', size: 'L', stock: 16, min: 3, barcode: '30000042' }
+    ] 
+  },
+  { 
+    id: 'b1000000-0000-4000-8000-000000000005', 
+    name: 'Hoodie Oversize Studio 450GSM', 
+    sku: 'HD-005', 
+    barcode: '3000005', 
+    category: 'Jackets & Hoodies', 
+    brand: 'Alpha', 
+    price: 399, 
+    purchasePrice: 180, 
+    image: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=1000&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=1000&q=80',
+      'https://images.unsplash.com/photo-1509967419530-da38b4704bc6?auto=format&fit=crop&w=1000&q=80'
+    ],
+    variants: [
+      { id: 'c1000000-0000-4000-8000-000000000012', color: 'Gris Anthracite', size: 'L', stock: 14, min: 3, barcode: '30000051' },
+      { id: 'c1000000-0000-4000-8000-000000000013', color: 'Noir Profond', size: 'XL', stock: 9, min: 3, barcode: '30000052' }
+    ] 
+  },
+  { 
+    id: 'b1000000-0000-4000-8000-000000000006', 
+    name: 'Casquette Alpha Wolf Minimal', 
+    sku: 'CP-006', 
+    barcode: '3000006', 
+    category: 'Accessoires', 
+    brand: 'Alpha', 
+    price: 129, 
+    purchasePrice: 50, 
+    image: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=1000&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=1000&q=80'
+    ],
+    variants: [
+      { id: 'c1000000-0000-4000-8000-000000000014', color: 'Noir', size: 'Unique', stock: 20, min: 3, barcode: '30000061' }
+    ] 
+  }
 ]
 
 export const useShop = defineStore('shop', {
@@ -110,46 +223,61 @@ export const useShop = defineStore('shop', {
 
     async saveProduct(product) {
       try {
+        const clean = JSON.parse(JSON.stringify(product || {}))
         const autoBarcode = '3' + Math.floor(10000000 + Math.random() * 90000000)
-        const namePrefix = (product.name || '').trim().slice(0, 3).toUpperCase().replace(/[^A-Z]/g, 'PRD') || 'PRD'
+        const namePrefix = (clean.name || '').trim().slice(0, 3).toUpperCase().replace(/[^A-Z]/g, 'PRD') || 'PRD'
         const autoSku = `${namePrefix}-${Math.floor(1000 + Math.random() * 9000)}`
 
+        const isUuid = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(str || ''))
+        const targetId = isUuid(clean.id) ? clean.id : crypto.randomUUID()
+
+        const imagesList = Array.isArray(clean.images) && clean.images.length > 0
+          ? clean.images
+          : (clean.image ? [clean.image] : [])
+
         const p = {
-          ...product,
-          id: product.id || crypto.randomUUID(),
-          sku: (product.sku && product.sku.trim()) ? product.sku.trim() : autoSku,
-          barcode: (product.barcode && product.barcode.trim()) ? product.barcode.trim() : autoBarcode,
-          category: (product.category && product.category.trim()) ? product.category.trim() : 'Général',
-          price: Number(product.price) || 0,
-          purchasePrice: Number(product.purchasePrice) || 0,
-          variants: (product.variants || []).map((v, idx) => ({
+          ...clean,
+          id: targetId,
+          sku: (clean.sku && clean.sku.trim()) ? clean.sku.trim() : autoSku,
+          barcode: (clean.barcode && clean.barcode.trim()) ? clean.barcode.trim() : autoBarcode,
+          category: (clean.category && clean.category.trim()) ? clean.category.trim() : 'Chemises',
+          image: imagesList[0] || clean.image || '',
+          images: imagesList,
+          hidden: Boolean(clean.hidden),
+          price: Number(clean.price) || 0,
+          purchasePrice: Number(clean.purchasePrice) || 0,
+          variants: (clean.variants || []).map((v, idx) => ({
             ...v,
-            id: v.id || crypto.randomUUID(),
-            barcode: (v.barcode && v.barcode.trim()) ? v.barcode.trim() : ((product.barcode || autoBarcode) + String(idx + 1)),
+            id: isUuid(v.id) ? v.id : crypto.randomUUID(),
+            barcode: (v.barcode && v.barcode.trim()) ? v.barcode.trim() : ((clean.barcode || autoBarcode) + String(idx + 1)),
             stock: Number(v.stock) || 0,
             min: Number(v.min) || 0
           }))
         }
-        await localDb.products.put(p)
-        const i = this.products.findIndex(x => x.id === p.id)
-        if (i < 0) this.products.push(p)
-        else this.products.splice(i, 1, p)
-        await this.queue('products', p)
+        const plainP = JSON.parse(JSON.stringify(p))
+        await localDb.products.put(plainP)
+        const i = this.products.findIndex(x => x.id === plainP.id || (clean.id && x.id === clean.id))
+        if (i < 0) this.products.push(plainP)
+        else this.products.splice(i, 1, plainP)
+        await this.queue('products', plainP)
 
-        // Direct push to Supabase products table
-        if (supabase) {
-          supabase.from('products').upsert({
-            id: p.id,
-            name: p.name || '',
-            sku: p.sku || null,
-            barcode: p.barcode || null,
-            price: p.price,
-            purchase_price: p.purchasePrice,
-            description: p.category || ''
-          }, { onConflict: 'id' }).then(() => {}).catch(() => {})
+        // Non-blocking Supabase sync
+        if (supabase && navigator.onLine) {
+          try {
+            supabase.from('products').upsert({
+              id: plainP.id,
+              name: plainP.name || '',
+              sku: plainP.sku || null,
+              barcode: plainP.barcode || null,
+              category: plainP.category || 'Chemises',
+              price: plainP.price,
+              purchase_price: plainP.purchasePrice,
+              description: plainP.category || ''
+            }, { onConflict: 'id' }).then(() => {}).catch(() => {})
+          } catch (_) {}
         }
 
-        this.notify(product.id ? 'Produit mis à jour ✓' : 'Produit créé ✓')
+        this.notify(product && product.id ? 'Produit mis à jour ✓' : 'Produit créé ✓')
       } catch (error) {
         console.error('saveProduct error:', error)
         this.notify(`Erreur : ${error.message}`)

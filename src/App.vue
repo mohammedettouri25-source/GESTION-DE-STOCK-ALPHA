@@ -1,10 +1,18 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useShop } from './stores/shop'
-import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText, Bot, Sparkles, Lock, LogOut, KeyRound, Eye, EyeOff, MessageCircle, Send, TrendingUp, Calendar, Download, ChevronDown, CheckCircle2 } from 'lucide-vue-next'
+import Storefront from './components/Storefront.vue'
+import { LayoutDashboard, Package, ShoppingCart, ShoppingBag, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText, Bot, Sparkles, Lock, LogOut, KeyRound, Eye, EyeOff, MessageCircle, Send, TrendingUp, Calendar, Download, ChevronDown, CheckCircle2 } from 'lucide-vue-next'
 import { createOzonParcel, getOzonParcelInfo } from './services/ozon'
 import { OZON_CITIES } from './services/ozonCities'
 import { generateOpenAiChatReply } from './services/openai'
+
+const currentViewMode = ref(localStorage.getItem('alpha-view-mode') || 'storefront')
+
+function setViewMode(mode) {
+  currentViewMode.value = mode
+  localStorage.setItem('alpha-view-mode', mode)
+}
 
 // Order state (declared first so city helpers can safely reference order.value)
 const order = ref({
@@ -423,14 +431,73 @@ const blank = () => {
     name: '',
     sku: autoSku,
     barcode: autoBarcode,
-    category: 'Général',
+    category: 'Chemises',
     brand: 'Alpha',
     price: 0,
     purchasePrice: 0,
-    variants: [{ color: 'Noir', size: 'Unique', stock: 0, min: 2, barcode: autoBarcode + '1' }]
+    hidden: false,
+    image: '',
+    images: [],
+    variants: [{ color: 'Noir', size: 'M', stock: 10, min: 2, barcode: autoBarcode + '1' }]
   }
 }
 const draft = ref(blank())
+
+function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.75) {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width)
+            width = maxWidth
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height)
+            height = maxHeight
+          }
+        }
+
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.onerror = () => resolve(e.target.result)
+      img.src = e.target.result
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+async function handleProductImageUpload(e) {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+  if (!draft.value.images) draft.value.images = []
+
+  for (const file of files) {
+    try {
+      const compressed = await compressImage(file)
+      draft.value.images.push(compressed)
+      if (!draft.value.image) draft.value.image = compressed
+    } catch (_) {}
+  }
+}
+
+function removeProductImage(index) {
+  if (draft.value.images) {
+    draft.value.images.splice(index, 1)
+    draft.value.image = draft.value.images[0] || ''
+  }
+}
 
 function onProductNameInput() {
   if (!draft.value.id) { // Only auto-generate when creating a new product
@@ -1141,7 +1208,9 @@ function navigate(id) { shop.query = ''; shop.active = id; mobile.value = false 
 
 function edit(p) {
   try {
-    draft.value = p ? JSON.parse(JSON.stringify(p)) : blank()
+    const cp = p ? JSON.parse(JSON.stringify(p)) : blank()
+    if (!cp.images) cp.images = cp.image ? [cp.image] : []
+    draft.value = cp
   } catch (_) {
     draft.value = blank()
   }
@@ -1399,6 +1468,31 @@ onMounted(async () => {
 </script>
 
 <template>
+  <Storefront 
+    v-if="currentViewMode === 'storefront'" 
+    @openAdmin="setViewMode('admin')" 
+  />
+
+  <div v-else>
+    <!-- Top Bar for switching to Storefront -->
+    <div style="background: #0f172a; color: #ffffff; padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; border-bottom: 1px solid #1e293b; position: relative; z-index: 60;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; display: inline-block;"></span>
+        <b style="color: #60a5fa; font-weight: 800;">ADMINISTRATEUR</b>
+        <span style="color: #475569;">|</span>
+        <span style="color: #cbd5e1; font-weight: 600;">ALPHA SHOP Gestion de Stock</span>
+      </div>
+
+      <button 
+        type="button"
+        @click="setViewMode('storefront')"
+        style="background: #2563eb; color: #ffffff; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 6px;"
+      >
+        <ShoppingBag :size="14" />
+        <span>Voir le Matjer / Storefront 🛍️</span>
+      </button>
+    </div>
+
   <!-- Modern Login Screen Overlay -->
   <div v-if="!authenticated" class="login-screen-bg">
     <div class="login-card">
@@ -1444,7 +1538,7 @@ onMounted(async () => {
 
     <aside :class="{open:mobile}">
       <div class="brand">
-        <span class="mark">A</span>
+        <img src="/alpha-logo.png" alt="ALPHASHOP07" style="height:30px; width:auto; object-fit:contain; filter:invert(1);" />
         <span>ALPHASHOP<sup>07</sup></span>
         <button class="icon mobile-close-btn" @click="mobile = false"><X :size="18"/></button>
       </div>
@@ -1642,7 +1736,13 @@ onMounted(async () => {
           <div v-for="p in filtered" :key="p.id" class="product-row" @click="edit(p)">
             <div>
               <div class="product-thumb">{{p.name[0]}}</div>
-              <span><b>{{p.name}}</b><small>{{p.sku}} · {{p.brand||'Sans marque'}}</small></span>
+              <span>
+                <b style="display:flex; align-items:center; gap:6px;">
+                  {{p.name}}
+                  <span v-if="p.hidden" style="font-size:10px; font-weight:800; color:#dc2626; background:#fee2e2; border:1px solid #fca5a5; padding:2px 8px; border-radius:10px;">🙈 Masqué (مخفي)</span>
+                </b>
+                <small>{{p.sku}} · {{p.brand||'Sans marque'}}</small>
+              </span>
             </div>
             <span>{{p.category}}</span>
             <strong>{{money(p.price)}}</strong>
@@ -2512,13 +2612,57 @@ onMounted(async () => {
           </label>
         </div>
         <div class="two">
-          <label>Catégorie (Auto-détectée)
-            <input v-model="draft.category" list="category-suggestions" placeholder="Ex: Textile"/>
-            <datalist id="category-suggestions">
-              <option v-for="cat in Array.from(new Set(['Textile', 'Accessoires', 'Chaussures', 'Beauté & Cosmétique', 'Électronique', 'Général', ...shop.products.map(p => p.category)]))" :key="cat" :value="cat" />
-            </datalist>
+          <label>Catégorie (المجموعة / التصنيف)
+            <select v-model="draft.category" required>
+              <option value="Chemises">👔 Chemises</option>
+              <option value="Ensembles">👕 Ensembles</option>
+              <option value="T-Shirts & Polos">👕 T-Shirts & Polos</option>
+              <option value="Shorts">🩳 Shorts & Bermudas</option>
+              <option value="Pantalons & Cargos">👖 Pantalons & Cargos</option>
+              <option value="Jackets & Hoodies">🧥 Jackets & Hoodies</option>
+              <option value="Accessoires">🧢 Accessoires</option>
+            </select>
           </label>
           <label>Marque<input v-model="draft.brand" placeholder="Ex: Alpha"/></label>
+        </div>
+        <!-- Storefront Product Visibility Switch Box -->
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+          <div>
+            <b style="font-size: 13px; color: #1e293b; display: flex; align-items: center; gap: 6px;">
+              👁️ Visibilité sur le Storefront (إخفاء / إظهار المنتج فـ المتجر)
+            </b>
+            <p style="font-size: 11px; color: #64748b; margin: 2px 0 0;">
+              {{ draft.hidden ? '🙈 Ce produit est MASQUÉ du Storefront (مخفي من المتجر ولن يظهر للزبناء)' : '🟢 Ce produit est VISIBLE sur le Storefront (ظاهر فـ المتجر للزبناء)' }}
+            </p>
+          </div>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 700; user-select: none;">
+            <input type="checkbox" v-model="draft.hidden" style="width: 18px; height: 18px; accent-color: #ef4444; cursor: pointer;" />
+            <span :style="{ color: draft.hidden ? '#ef4444' : '#16a34a' }">
+              {{ draft.hidden ? 'Masquer (مخفي)' : 'Visible (ظاهر)' }}
+            </span>
+          </label>
+        </div>
+
+        <!-- Multi-Image Upload Area -->
+        <div style="margin-bottom: 16px;">
+          <label style="display:block; font-size:12px; font-weight:700; margin-bottom:6px; color:#334155;">
+            🖼️ Photos du Produit (Multi-Images / صور المنتج من جهازك)
+          </label>
+          <div style="border:2px dashed #cbd5e1; padding:12px; border-radius:12px; text-align:center; background:#f8fafc;">
+            <input type="file" multiple accept="image/*" @change="handleProductImageUpload" id="prod-img-input" style="display:none;" />
+            <label for="prod-img-input" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#2563eb; background:#ffffff; padding:8px 14px; border-radius:8px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+              📁 Sélectionner des photos depuis l'appareil
+            </label>
+            <p style="font-size:11px; color:#64748b; margin-top:6px;">Vous pouvez ajouter plusieurs photos pour les afficher dans la carte du Storefront.</p>
+          </div>
+
+          <!-- Thumbnails Preview Bar -->
+          <div v-if="draft.images && draft.images.length > 0" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+            <div v-for="(img, idx) in draft.images" :key="idx" style="position:relative; width:64px; height:64px; border-radius:8px; overflow:hidden; border:1px solid #cbd5e1;">
+              <img :src="img" style="width:100%; height:100%; object-fit:cover;" />
+              <button type="button" @click="removeProductImage(idx)" style="position:absolute; top:2px; right:2px; background:rgba(220,38,38,0.9); color:#fff; border:none; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:10px;" title="Supprimer cette photo">✕</button>
+            </div>
+          </div>
         </div>
         <div class="two">
           <label>Prix de vente (MAD)<input v-model.number="draft.price" type="number" min="0" required/></label>
@@ -2532,8 +2676,32 @@ onMounted(async () => {
             </button>
           </div>
           <div v-for="(v,i) in draft.variants" :key="i" class="variant-fields">
-            <input v-model="v.color" placeholder="Couleur"/>
-            <input v-model="v.size" placeholder="Taille"/>
+            <select v-model="v.color" style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; background:#fff;">
+              <option value="" disabled>-- Couleur / اللون --</option>
+              <option value="Noir">⬛ Noir (أسود)</option>
+              <option value="Blanc">⬜ Blanc (أبيض)</option>
+              <option value="Bleu Ciel">🟦 Bleu Ciel (أزرق سماوي)</option>
+              <option value="Bleu Marine">🔵 Bleu Marine (أزرق داكن)</option>
+              <option value="Beige">🟫 Beige / Sable (بيج)</option>
+              <option value="Marron">🟤 Marron (بني)</option>
+              <option value="Vert Olive">🟩 Vert Olive (أخضر زيتي)</option>
+              <option value="Gris">🩶 Gris (رمادي)</option>
+              <option value="Rouge">🟥 Rouge / Bordeaux (أحمر)</option>
+            </select>
+            <select v-model="v.size" style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; background:#fff;">
+              <option value="" disabled>-- Taille / المقاس --</option>
+              <option value="S">S</option>
+              <option value="M">M</option>
+              <option value="L">L</option>
+              <option value="XL">XL</option>
+              <option value="XXL">XXL</option>
+              <option value="3XL">3XL</option>
+              <option value="38">38 (Pantalon/Pointure)</option>
+              <option value="40">40 (Pantalon/Pointure)</option>
+              <option value="42">42 (Pantalon/Pointure)</option>
+              <option value="44">44 (Pantalon/Pointure)</option>
+              <option value="Standard">Standard / Unique (مقاس موحد)</option>
+            </select>
             <input v-model.number="v.stock" type="number" placeholder="Stock"/>
             <button type="button" class="icon" @click="draft.variants.splice(i,1)" :disabled="draft.variants.length===1"><X :size="15"/></button>
           </div>
@@ -3263,5 +3431,6 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+  </div>
   </div>
 </template>
