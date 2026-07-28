@@ -359,7 +359,7 @@ onMounted(() => {
 const relatedProducts = computed(() => {
   if (!activeProduct.value) return []
   return (shop.products || [])
-    .filter(p => p.id !== activeProduct.value.id && p.category === activeProduct.value.category)
+    .filter(p => !p.hidden && p.id !== activeProduct.value.id && p.category === activeProduct.value.category)
     .slice(0, 4)
 })
 
