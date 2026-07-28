@@ -433,6 +433,7 @@ async function submitOrder() {
       paidAmount: 0
     }
 
+    const cartSnapshot = JSON.parse(JSON.stringify(shop.cart))
     await shop.checkout('Paiement à la livraison (COD)', details)
 
     orderSuccess.value = {
@@ -442,7 +443,7 @@ async function submitOrder() {
       city: orderForm.value.city,
       address: orderForm.value.address,
       total: cartTotal.value,
-      items: [...shop.cart]
+      items: cartSnapshot
     }
 
     shop.clearCart()

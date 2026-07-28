@@ -382,12 +382,12 @@ export const useShop = defineStore('shop', {
         const paidAmount = Number(details.paidAmount) || saleTotal
         const remainingBalance = Math.max(0, saleTotal - paidAmount)
 
-        const sale = {
+        const rawSale = {
           id: crypto.randomUUID(),
           number: saleNum,
           createdAt: new Date().toISOString(),
           items: this.cart.map(({ productId, variantId, sku, name, variant, price, quantity }) => ({
-            productId, variantId, sku, name, variant, price, quantity
+            productId, variantId, sku, name, variant: variant ? JSON.parse(JSON.stringify(variant)) : null, price, quantity
           })),
           subtotal: this.cartTotal,
           discount,
@@ -395,10 +395,13 @@ export const useShop = defineStore('shop', {
           total: saleTotal,
           paidAmount,
           remainingBalance,
-          customer: details.customer ? { ...details.customer } : null,
+          customer: details.customer ? JSON.parse(JSON.stringify(details.customer)) : null,
           payment,
           status: 'completed'
         }
+
+        // Clean sale object to prevent IndexedDB DataCloneError from Vue reactive proxies
+        const sale = JSON.parse(JSON.stringify(rawSale))
 
         // Bug fix: update stock immutably to trigger Vue reactivity
         for (const item of sale.items) {
@@ -412,7 +415,7 @@ export const useShop = defineStore('shop', {
           const updatedVariants = p.variants.map((v, i) =>
             i === vIdx ? { ...v, stock: v.stock - item.quantity } : { ...v }
           )
-          const updatedProduct = { ...p, variants: updatedVariants }
+          const updatedProduct = JSON.parse(JSON.stringify({ ...p, variants: updatedVariants }))
           this.products.splice(pIdx, 1, updatedProduct)
 
           await localDb.products.put(updatedProduct)
@@ -561,7 +564,8 @@ export const useShop = defineStore('shop', {
     },
 
     async queue(table, payload) {
-      await localDb.queue.add({ table, payload, createdAt: new Date().toISOString() })
+      const cleanPayload = payload ? JSON.parse(JSON.stringify(payload)) : null
+      await localDb.queue.add({ table, payload: cleanPayload, createdAt: new Date().toISOString() })
       if (this.online) this.sync()
     },
 
