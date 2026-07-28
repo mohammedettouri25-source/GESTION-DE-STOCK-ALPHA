@@ -2,6 +2,36 @@ import { defineStore } from 'pinia'
 import { localDb } from '../lib/db'
 import { supabase } from '../lib/supabase'
 
+// Ensure we catch ALL Dexie errors natively without tree-shaking
+['products', 'sales', 'customers', 'movements', 'queue'].forEach(t => {
+  const table = localDb[t]
+  if (!table) return
+  const op = table.put.bind(table)
+  table.put = async function(i, k) {
+    try { return await op(i, k) }
+    catch (e) {
+      console.error(`🚨 FATAL DEXIE PUT ERROR IN ${t}! Payload:`, i)
+      throw new Error(`DEXIE_PUT_ERROR_${t}: ${e.message}`)
+    }
+  }
+  const oa = table.add.bind(table)
+  table.add = async function(i, k) {
+    try { return await oa(i, k) }
+    catch (e) {
+      console.error(`🚨 FATAL DEXIE ADD ERROR IN ${t}! Payload:`, i)
+      throw new Error(`DEXIE_ADD_ERROR_${t}: ${e.message}`)
+    }
+  }
+  const od = table.delete.bind(table)
+  table.delete = async function(k) {
+    try { return await od(k) }
+    catch (e) {
+      console.error(`🚨 FATAL DEXIE DELETE ERROR IN ${t}! Key:`, k)
+      throw new Error(`DEXIE_DELETE_ERROR_${t}: ${e.message}`)
+    }
+  }
+})
+
 let realtimeChannel = null
 
 const seed = [
