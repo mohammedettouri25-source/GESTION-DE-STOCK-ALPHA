@@ -486,18 +486,30 @@ export const useShop = defineStore('shop', {
                   i === vIdx ? { ...v, stock: (Number(v.stock) || 0) + (Number(item.quantity) || 1) } : { ...v }
                 )
                 const updatedProduct = JSON.parse(JSON.stringify({ ...rawProduct, variants: updatedVariants }))
-                await localDb.products.put(updatedProduct)
+                
+                try {
+                  await localDb.products.put(updatedProduct)
+                } catch (e) {
+                  console.error('FAILED AT localDb.products.put! Payload:', updatedProduct)
+                  throw new Error(`localDb.products.put: ${e.message}`)
+                }
+
                 await this.queue('products', updatedProduct)
 
                 this.products.splice(pIdx, 1, updatedProduct)
 
-                await localDb.movements.add(JSON.parse(JSON.stringify({
-                  id: crypto.randomUUID(),
-                  productId: rawProduct.id,
-                  type: 'return',
-                  quantity: Number(item.quantity) || 1,
-                  createdAt: new Date().toISOString()
-                })))
+                try {
+                  await localDb.movements.add(JSON.parse(JSON.stringify({
+                    id: crypto.randomUUID(),
+                    productId: rawProduct.id,
+                    type: 'return',
+                    quantity: Number(item.quantity) || 1,
+                    createdAt: new Date().toISOString()
+                  })))
+                } catch (e) {
+                  console.error('FAILED AT localDb.movements.add!')
+                  throw new Error(`localDb.movements.add: ${e.message}`)
+                }
               }
             }
           }
@@ -508,7 +520,12 @@ export const useShop = defineStore('shop', {
           await this.revertCustomerCredit(sale.customer, sale.remainingBalance, sale.number)
         }
 
-        await localDb.sales.delete(targetId)
+        try {
+          await localDb.sales.delete(targetId)
+        } catch (e) {
+          throw new Error(`localDb.sales.delete: ${e.message}`)
+        }
+        
         this.sales.splice(index, 1)
 
         await this.queue('sales', { id: targetId, deleted: true })
@@ -875,13 +892,21 @@ export const useShop = defineStore('shop', {
             totalPurchases: Math.max(0, (Number(existing.totalPurchases) || 0) - creditAmount),
             creditHistory: (existing.creditHistory || []).filter(h => h.saleNumber !== saleNumber)
           }))
-          await localDb.customers.put(updated)
+          
+          try {
+            await localDb.customers.put(updated)
+          } catch (e) {
+            console.error('FAILED AT localDb.customers.put! Payload:', updated)
+            throw new Error(`localDb.customers.put: ${e.message}`)
+          }
+
           const idx = this.customers.findIndex(x => x.id === updated.id)
           if (idx >= 0) this.customers.splice(idx, 1, updated)
           await this.queue('customers', updated)
         }
       } catch (err) {
         console.error('revertCustomerCredit error:', err)
+        throw err
       }
     },
 
