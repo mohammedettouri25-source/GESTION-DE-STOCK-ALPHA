@@ -481,7 +481,7 @@ export const useShop = defineStore('shop', {
                 const updatedVariants = p.variants.map((v, i) =>
                   i === vIdx ? { ...v, stock: v.stock + (Number(item.quantity) || 1) } : { ...v }
                 )
-                const updatedProduct = { ...p, variants: updatedVariants }
+                const updatedProduct = JSON.parse(JSON.stringify({ ...p, variants: updatedVariants }))
                 this.products.splice(pIdx, 1, updatedProduct)
 
                 await localDb.products.put(updatedProduct)
