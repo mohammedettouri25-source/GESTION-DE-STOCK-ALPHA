@@ -13,8 +13,8 @@ const emit = defineEmits(['openAdmin'])
 
 const shop = useShop()
 
-// Language State ('ar' by default as requested by user)
-const currentLang = ref('ar')
+// Language State
+const currentLang = ref('fr')
 
 function toggleLang() {
   currentLang.value = currentLang.value === 'ar' ? 'fr' : 'ar'
@@ -120,6 +120,49 @@ const maxPriceLimit = ref(1000)
 
 // Cart & Order State
 const cartOpen = ref(false)
+
+const undoToast = ref(null)
+let undoTimer = null
+
+function openUndoToast(product, variant, addedIndex) {
+  if (undoTimer) clearInterval(undoTimer)
+  
+  undoToast.value = {
+    product,
+    variant,
+    index: addedIndex,
+    timeLeft: 5
+  }
+  
+  undoTimer = setInterval(() => {
+    if (undoToast.value) {
+      undoToast.value.timeLeft--
+      if (undoToast.value.timeLeft <= 0) {
+        clearInterval(undoTimer)
+        undoToast.value = null
+      }
+    } else {
+      clearInterval(undoTimer)
+    }
+  }, 1000)
+}
+
+function executeUndo() {
+  if (!undoToast.value) return
+  const { product, variant, index } = undoToast.value
+  
+  if (index > -1 && shop.cart[index]) {
+    if (shop.cart[index].quantity > 1) {
+      shop.cart[index].quantity--
+    } else {
+      shop.cart.splice(index, 1)
+    }
+    shop.notify(currentLang.value === 'ar' ? 'تم التراجع عن الإضافة' : 'Ajout annulé')
+  }
+  
+  clearInterval(undoTimer)
+  undoToast.value = null
+}
 const checkoutOpen = ref(false)
 const orderSuccess = ref(null)
 const isSubmitting = ref(false)
@@ -394,11 +437,12 @@ function addToCart(product, variant = null, buyNow = false) {
   }
 
   const existingIndex = shop.cart.findIndex(i => i.productId === product.id && i.variantId === targetVariant.id)
-  
+  let addedIndex = -1
+
   if (existingIndex > -1) {
     if (shop.cart[existingIndex].quantity < targetVariant.stock) {
       shop.cart[existingIndex].quantity++
-      shop.notify(`Quantité mise à jour (${targetVariant.size || ''})`)
+      addedIndex = existingIndex
     } else {
       shop.notify('Stock maximum atteint pour cet article')
     }
@@ -415,13 +459,13 @@ function addToCart(product, variant = null, buyNow = false) {
       quantity: 1,
       available: targetVariant.stock
     })
-    shop.notify('Ajouté au panier 🛒')
+    addedIndex = shop.cart.length - 1
   }
 
   if (buyNow) {
     checkoutOpen.value = true
-  } else {
-    cartOpen.value = true
+  } else if (addedIndex > -1) {
+    openUndoToast(product, targetVariant, addedIndex)
   }
 }
 
@@ -560,15 +604,7 @@ function getProductImagesList(product) {
             <span>{{ currentLang === 'ar' ? '🇫🇷 FR' : '🇲🇦 العربية' }}</span>
           </button>
 
-          <!-- Switch to Admin Dashboard button -->
-          <button 
-            @click="emit('openAdmin')"
-            class="admin-switch-btn"
-            :title="currentLang === 'ar' ? 'لوحة التحكم' : 'Administration'"
-          >
-            <Lock :size="13" />
-            <span class="desktop-only">{{ currentLang === 'ar' ? 'الإدارة' : 'Admin' }}</span>
-          </button>
+
 
           <!-- Shopping Cart Button -->
           <button 
@@ -914,6 +950,23 @@ function getProductImagesList(product) {
         </div>
       </section>
 
+    </div>
+
+    <!-- UNDO TOAST -->
+    <div v-if="undoToast" class="undo-toast-container">
+      <div class="undo-toast-content">
+        <div class="undo-info">
+          <CheckCircle2 :size="18" style="color:#059669; flex-shrink:0" />
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <strong>{{ undoToast.product.name }}</strong>
+            <span style="font-size:11px; color:#6e6e73;">{{ currentLang === 'ar' ? 'أضيف إلى السلة' : 'Ajouté au panier' }} ({{ undoToast.timeLeft }}s)</span>
+          </div>
+        </div>
+        <button class="undo-btn" @click="executeUndo">{{ currentLang === 'ar' ? 'تراجع' : 'Annuler' }}</button>
+      </div>
+      <div class="undo-progress-bar">
+        <div class="undo-progress-fill" :style="{ width: (undoToast.timeLeft / 5 * 100) + '%' }"></div>
+      </div>
     </div>
 
     <!-- CART DRAWER -->
@@ -2170,7 +2223,7 @@ function getProductImagesList(product) {
 
 /* Cart Panel */
 .cart-panel {
-  position: fixed;
+  position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
@@ -2180,6 +2233,7 @@ function getProductImagesList(product) {
   display: flex;
   flex-direction: column;
   box-shadow: -10px 0 30px rgba(0,0,0,0.15);
+  z-index: 99999;
 }
 .panel-header {
   padding: 16px 20px;
@@ -2710,5 +2764,70 @@ function getProductImagesList(product) {
     padding: 10px 12px;
     border-radius: 12px;
   }
+}
+/* Undo Toast CSS */
+.undo-toast-container {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.12), 0 2px 10px rgba(0,0,0,0.08);
+  width: calc(100% - 32px);
+  max-width: 360px;
+  z-index: 999999;
+  overflow: hidden;
+  border: 1px solid #e5e5e7;
+  animation: slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translate(-50%, 20px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.undo-toast-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+.undo-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.undo-info strong {
+  font-size: 13px;
+  color: #1d1d1f;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+.undo-btn {
+  background: none;
+  border: none;
+  color: #0071e3;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.undo-btn:hover {
+  background: #f5f5f7;
+}
+.undo-progress-bar {
+  height: 3px;
+  background: #f5f5f7;
+  width: 100%;
+}
+.undo-progress-fill {
+  height: 100%;
+  background: #059669;
+  transition: width 1s linear;
 }
 </style>

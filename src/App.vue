@@ -1495,6 +1495,12 @@ onMounted(async () => {
 
   await shop.init()
   const params = new URLSearchParams(window.location.search)
+  if (params.get('admin') === '1') {
+    setViewMode('admin')
+    // Remove it from URL cleanly
+    window.history.replaceState({}, document.title, window.location.pathname)
+  }
+  
   const invNum = params.get('invoice')
   if (invNum) {
     const sale = shop.sales.find(s => String(s.number).toLowerCase() === String(invNum).toLowerCase())
