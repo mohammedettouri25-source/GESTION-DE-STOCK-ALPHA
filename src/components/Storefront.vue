@@ -226,6 +226,17 @@ const availableColors = computed(() => {
     .filter((c, idx, self) => c && self.indexOf(c) === idx)
 })
 
+const filteredVariantsByColor = computed(() => {
+  if (!activeProduct.value || !Array.isArray(activeProduct.value.variants)) return []
+  if (selectedColor.value && availableColors.value.length > 0) {
+    const matched = activeProduct.value.variants.filter(
+      v => (v.color || '').trim().toLowerCase() === selectedColor.value.trim().toLowerCase()
+    )
+    if (matched.length > 0) return matched
+  }
+  return activeProduct.value.variants
+})
+
 function getColorHex(colorName) {
   if (!colorName) return '#cbd5e1'
   const c = colorName.toLowerCase()
@@ -817,7 +828,7 @@ function getProductImagesList(product) {
             <label>{{ currentLang === 'ar' ? 'اختر المقاس:' : 'Choisir la taille (Size):' }}</label>
             <div class="size-buttons">
               <button 
-                v-for="v in activeProduct.variants" 
+                v-for="v in filteredVariantsByColor" 
                 :key="v.id"
                 @click="selectedVariant = v"
                 :disabled="v.stock <= 0"
