@@ -1216,6 +1216,19 @@ function edit(p) {
   }
   productModal.value = true
 }
+
+function copyProductUrl(p) {
+  const url = `https://alphashop07.com/?product=${p.id}`
+  if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      shop.notify(`✅ Lien copié: ${url}`)
+    }).catch(() => {
+      shop.notify(url)
+    })
+  } else {
+    shop.notify(url)
+  }
+}
 async function save() { if (!draft.value.name) return shop.notify('Le nom du produit est requis'); await shop.saveProduct(draft.value); productModal.value = false }
 function selectVariant(p) { if (p.variants.length === 1) shop.addCart(p, p.variants[0]); else variantModal.value = p }
 function money(n) {
@@ -1731,6 +1744,7 @@ onMounted(async () => {
             <span>Catégorie</span>
             <span>Prix</span>
             <span>Stock</span>
+            <span>Lien</span>
             <span></span>
           </div>
           <div v-for="p in filtered" :key="p.id" class="product-row" @click="edit(p)">
@@ -1749,6 +1763,9 @@ onMounted(async () => {
             <span :class="{danger:p.variants.reduce((n,v)=>n+v.stock,0)<=p.variants.reduce((n,v)=>n+v.min,0)}">
               {{p.variants.reduce((n,v)=>n+v.stock,0)}} en stock
             </span>
+            <button class="icon" style="color:#0071e3; font-size:11px; font-weight:700; display:flex; align-items:center; gap:4px;" @click.stop="copyProductUrl(p)" :title="'https://alphashop07.com/?product=' + p.id">
+              📋 Copier
+            </button>
             <button class="icon" @click.stop="edit(p)"><MoreHorizontal :size="18"/></button>
           </div>
         </div>
