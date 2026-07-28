@@ -34,6 +34,9 @@ import { supabase } from '../lib/supabase'
 
 let realtimeChannel = null
 
+// Anti-tree-shaking deep clone to ensure Vue proxies are fully unwrapped
+function cloneDeep(obj) { if (obj === null || typeof obj !== 'object') return obj; if (Array.isArray(obj)) return obj.map(cloneDeep); const res = {}; for (const key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { res[key] = cloneDeep(obj[key]); } } return res; }
+
 const seed = [
   { 
     id: 'b1000000-0000-4000-8000-000000000001', 
@@ -253,7 +256,7 @@ export const useShop = defineStore('shop', {
 
     async saveProduct(product) {
       try {
-        const clean = JSON.parse(JSON.stringify(product || {}))
+        const clean = cloneDeep(product || {})
         const autoBarcode = '3' + Math.floor(10000000 + Math.random() * 90000000)
         const namePrefix = (clean.name || '').trim().slice(0, 3).toUpperCase().replace(/[^A-Z]/g, 'PRD') || 'PRD'
         const autoSku = `${namePrefix}-${Math.floor(1000 + Math.random() * 9000)}`
@@ -284,7 +287,7 @@ export const useShop = defineStore('shop', {
             min: Number(v.min) || 0
           }))
         }
-        const plainP = JSON.parse(JSON.stringify(p))
+        const plainP = cloneDeep(p)
         await localDb.products.put(plainP)
         const i = this.products.findIndex(x => x.id === plainP.id || (clean.id && x.id === clean.id))
         if (i < 0) this.products.push(plainP)
@@ -386,7 +389,7 @@ export const useShop = defineStore('shop', {
         sale.status = status
         sale.whatsappConfirmedAt = new Date().toISOString()
         if (notes) sale.whatsappNotes = notes
-        const raw = JSON.parse(JSON.stringify(sale))
+        const raw = cloneDeep(sale)
         await localDb.sales.put(raw)
         if (this.online) {
           try {
@@ -417,7 +420,7 @@ export const useShop = defineStore('shop', {
           number: saleNum,
           createdAt: new Date().toISOString(),
           items: this.cart.map(({ productId, variantId, sku, name, variant, price, quantity }) => ({
-            productId, variantId, sku, name, variant: variant ? JSON.parse(JSON.stringify(variant)) : null, price, quantity
+            productId, variantId, sku, name, variant: variant ? cloneDeep(variant) : null, price, quantity
           })),
           subtotal: this.cartTotal,
           discount,
@@ -425,7 +428,7 @@ export const useShop = defineStore('shop', {
           total: saleTotal,
           paidAmount,
           remainingBalance,
-          customer: details.customer ? JSON.parse(JSON.stringify(details.customer)) : null,
+          customer: details.customer ? cloneDeep(details.customer) : null,
           payment,
           source: details.source || 'pos',
           status: details.status || (details.source === 'storefront' ? 'unconfirmed' : 'completed'),
@@ -433,13 +436,13 @@ export const useShop = defineStore('shop', {
         }
 
         // Clean sale object to prevent IndexedDB DataCloneError from Vue reactive proxies
-        const sale = JSON.parse(JSON.stringify(rawSale))
+        const sale = cloneDeep(rawSale)
 
         // Bug fix: update stock immutably to trigger Vue reactivity
         for (const item of sale.items) {
           const pIdx = this.products.findIndex(x => x.id === item.productId)
           if (pIdx < 0) throw new Error(`Produit introuvable: ${item.name}`)
-          const rawProduct = JSON.parse(JSON.stringify(this.products[pIdx]))
+          const rawProduct = cloneDeep(this.products[pIdx])
           const vIdx = Array.isArray(rawProduct.variants) ? rawProduct.variants.findIndex(x => x.id === item.variantId) : -1
           if (vIdx < 0) throw new Error(`Variante introuvable pour: ${item.name}`)
 
@@ -447,19 +450,19 @@ export const useShop = defineStore('shop', {
           const updatedVariants = rawProduct.variants.map((v, i) =>
             i === vIdx ? { ...v, stock: Math.max(0, (Number(v.stock) || 0) - item.quantity) } : { ...v }
           )
-          const updatedProduct = JSON.parse(JSON.stringify({ ...rawProduct, variants: updatedVariants }))
+          const updatedProduct = cloneDeep({ ...rawProduct, variants: updatedVariants })
           await localDb.products.put(updatedProduct)
           await this.queue('products', updatedProduct)
 
           this.products.splice(pIdx, 1, updatedProduct)
 
-          await localDb.movements.add(JSON.parse(JSON.stringify({
+          await localDb.movements.add(cloneDeep({
             id: crypto.randomUUID(),
             productId: rawProduct.id,
             type: 'sale',
             quantity: -item.quantity,
             createdAt: sale.createdAt
-          })))
+          }))
         }
 
         await localDb.sales.add(sale)
@@ -484,7 +487,7 @@ export const useShop = defineStore('shop', {
     async attachShipment(saleId, shipment) {
       const index = this.sales.findIndex(sale => sale.id === saleId)
       if (index < 0) return
-      const sale = JSON.parse(JSON.stringify(this.sales[index]))
+      const sale = cloneDeep(this.sales[index])
       sale.shipment = {
         tracking: String(shipment.tracking || ''),
         city: String(shipment.city || ''),
@@ -502,20 +505,20 @@ export const useShop = defineStore('shop', {
         const index = this.sales.findIndex(s => s.id === targetId)
         if (index < 0) return
 
-        const sale = JSON.parse(JSON.stringify(this.sales[index]))
+        const sale = cloneDeep(this.sales[index])
 
         // Restituer le stock en cas de retour / annulation
         if (restoreStock && Array.isArray(sale.items)) {
           for (const item of sale.items) {
             const pIdx = this.products.findIndex(x => x.id === item.productId || x.sku === item.sku)
             if (pIdx >= 0) {
-              const rawProduct = JSON.parse(JSON.stringify(this.products[pIdx]))
+              const rawProduct = cloneDeep(this.products[pIdx])
               const vIdx = Array.isArray(rawProduct.variants) ? rawProduct.variants.findIndex(x => x.id === item.variantId) : -1
               if (vIdx >= 0) {
                 const updatedVariants = rawProduct.variants.map((v, i) =>
                   i === vIdx ? { ...v, stock: (Number(v.stock) || 0) + (Number(item.quantity) || 1) } : { ...v }
                 )
-                const updatedProduct = JSON.parse(JSON.stringify({ ...rawProduct, variants: updatedVariants }))
+                const updatedProduct = cloneDeep({ ...rawProduct, variants: updatedVariants })
                 
                 try {
                   await localDb.products.put(updatedProduct)
@@ -529,13 +532,13 @@ export const useShop = defineStore('shop', {
                 this.products.splice(pIdx, 1, updatedProduct)
 
                 try {
-                  await localDb.movements.add(JSON.parse(JSON.stringify({
+                  await localDb.movements.add(cloneDeep({
                     id: crypto.randomUUID(),
                     productId: rawProduct.id,
                     type: 'return',
                     quantity: Number(item.quantity) || 1,
                     createdAt: new Date().toISOString()
-                  })))
+                  }))
                 } catch (e) {
                   console.error('FAILED AT localDb.movements.add!')
                   throw new Error(`localDb.movements.add: ${e.message}`)
@@ -576,7 +579,7 @@ export const useShop = defineStore('shop', {
         if (!updatedSale || !updatedSale.id) return
         
         // Clean Vue proxies to prevent IndexedDB DataCloneError
-        const raw = JSON.parse(JSON.stringify(updatedSale))
+        const raw = cloneDeep(updatedSale)
         const index = this.sales.findIndex(s => s.id === raw.id)
         if (index < 0) return
 
@@ -617,7 +620,7 @@ export const useShop = defineStore('shop', {
 
     async queue(table, payload) {
       try {
-        const cleanPayload = payload ? JSON.parse(JSON.stringify(payload)) : null
+        const cleanPayload = payload ? cloneDeep(payload) : null
         await localDb.queue.add({ table, payload: cleanPayload, createdAt: new Date().toISOString() })
         if (this.online) this.sync()
       } catch (e) {
@@ -829,7 +832,7 @@ export const useShop = defineStore('shop', {
 
     async saveCustomer(customer) {
       try {
-        const c = JSON.parse(JSON.stringify({
+        const c = cloneDeep({
           ...customer,
           id: customer.id || crypto.randomUUID(),
           name: customer.name || '',
@@ -837,7 +840,7 @@ export const useShop = defineStore('shop', {
           city: customer.city || '',
           address: customer.address || '',
           createdAt: customer.createdAt || new Date().toISOString()
-        }))
+        })
         await localDb.customers.put(c)
         const idx = this.customers.findIndex(x => x.id === c.id)
         if (idx < 0) this.customers.unshift(c)
@@ -874,21 +877,21 @@ export const useShop = defineStore('shop', {
 
         if (existing) {
           // Accumulate credit on existing customer
-          const updated = JSON.parse(JSON.stringify({
+          const updated = cloneDeep({
             ...existing,
             totalPurchases: (Number(existing.totalPurchases) || 0) + creditAmount,
             creditHistory: [
               ...(existing.creditHistory || []),
               { saleNumber, amount: creditAmount, date: new Date().toISOString() }
             ]
-          }))
+          })
           await localDb.customers.put(updated)
           const idx = this.customers.findIndex(x => x.id === updated.id)
           if (idx >= 0) this.customers.splice(idx, 1, updated)
           await this.queue('customers', updated)
         } else {
           // Auto-create customer with initial credit
-          const newCustomer = JSON.parse(JSON.stringify({
+          const newCustomer = cloneDeep({
             id: crypto.randomUUID(),
             name,
             phone,
@@ -900,7 +903,7 @@ export const useShop = defineStore('shop', {
               { saleNumber, amount: creditAmount, date: new Date().toISOString() }
             ],
             createdAt: new Date().toISOString()
-          }))
+          })
           await localDb.customers.put(newCustomer)
           this.customers.unshift(newCustomer)
           await this.queue('customers', newCustomer)
@@ -922,11 +925,11 @@ export const useShop = defineStore('shop', {
         )
 
         if (existing) {
-          const updated = JSON.parse(JSON.stringify({
+          const updated = cloneDeep({
             ...existing,
             totalPurchases: Math.max(0, (Number(existing.totalPurchases) || 0) - creditAmount),
             creditHistory: (existing.creditHistory || []).filter(h => h.saleNumber !== saleNumber)
-          }))
+          })
           
           try {
             await localDb.customers.put(updated)
@@ -954,14 +957,14 @@ export const useShop = defineStore('shop', {
         const currentDebt = Math.max(0, (Number(customer.totalPurchases) || 0) - (Number(customer.totalPaid) || 0))
         const payment = Math.min(paymentAmount, currentDebt)
 
-        const updated = JSON.parse(JSON.stringify({
+        const updated = cloneDeep({
           ...customer,
           totalPaid: (Number(customer.totalPaid) || 0) + payment,
           creditHistory: [
             ...(customer.creditHistory || []),
             { saleNumber: 'PAIEMENT', amount: -payment, date: new Date().toISOString() }
           ]
-        }))
+        })
         await localDb.customers.put(updated)
         this.customers.splice(idx, 1, updated)
         await this.queue('customers', updated)
@@ -1008,7 +1011,7 @@ export const useShop = defineStore('shop', {
         const amount = Math.max(0, Number(paymentAmount) || 0)
         if (amount <= 0) return this.notify('Veuillez entrer un montant valide')
 
-        const s = JSON.parse(JSON.stringify(this.suppliers[idx]))
+        const s = cloneDeep(this.suppliers[idx])
         s.totalPaid = (Number(s.totalPaid) || 0) + amount
         s.balanceOwed = Math.max(0, (Number(s.totalPurchases) || 0) - s.totalPaid)
 
@@ -1068,7 +1071,7 @@ export const useShop = defineStore('shop', {
         if (e.supplierId) {
           const sIdx = this.suppliers.findIndex(x => x.id === e.supplierId)
           if (sIdx >= 0) {
-            const supplier = JSON.parse(JSON.stringify(this.suppliers[sIdx]))
+            const supplier = cloneDeep(this.suppliers[sIdx])
             supplier.totalPurchases = (Number(supplier.totalPurchases) || 0) + totalInvoice
             supplier.totalPaid = (Number(supplier.totalPaid) || 0) + amount
             supplier.balanceOwed = Math.max(0, supplier.totalPurchases - supplier.totalPaid)
