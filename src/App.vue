@@ -1248,6 +1248,9 @@ function edit(p) {
         
         // Migrate legacy variant image to images array
         if (!v.images) v.images = v.image ? [v.image] : []
+        
+        // Initialize multi-size selection array
+        if (!v.sizes) v.sizes = v.size ? [v.size] : []
       })
     }
     
@@ -2815,13 +2818,13 @@ onMounted(async () => {
         <div class="variants">
           <div class="section-line">
             <b>Variantes & stock</b>
-            <button type="button" class="text-btn" @click="draft.variants.push({presetColor:'',color:'',size:'',stock:0,min:2,barcode:'',image:''})">
+            <button type="button" class="text-btn" @click="draft.variants.push({presetColor:'',color:'',size:'',sizes:[],stock:0,min:2,barcode:'',image:''})">
               <Plus :size="14"/> Ajouter
             </button>
           </div>
           <div v-for="(v,i) in draft.variants" :key="i" style="background: #f8fafc; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 10px;">
             <div class="variant-fields" style="display:flex; align-items:center; gap:8px;">
-              <div style="display:flex; flex-direction:column; gap:6px; flex: 1;">
+              <div style="display:flex; flex-direction:column; gap:6px; flex: 1.5;">
                 <select v-model="v.presetColor" @change="v.color = v.presetColor === 'Autre' ? '' : v.presetColor" style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; background:#fff;">
                   <option value="" disabled>-- Couleur / اللون --</option>
                   <option value="Noir">⬛ Noir (أسود)</option>
@@ -2844,20 +2847,15 @@ onMounted(async () => {
                 <input v-if="v.presetColor === 'Autre'" v-model="v.color" type="text" placeholder="Saisir la couleur..." style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; width: 100%; box-sizing: border-box;" />
               </div>
 
-              <select v-model="v.size" style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; background:#fff; flex: 1;">
-                <option value="" disabled>-- Taille / المقاس --</option>
-                <option value="S">S</option>
-                <option value="M">M</option>
-                <option value="L">L</option>
-                <option value="XL">XL</option>
-                <option value="XXL">XXL</option>
-                <option value="3XL">3XL</option>
-                <option value="38">38 (Pantalon/Pointure)</option>
-                <option value="40">40 (Pantalon/Pointure)</option>
-                <option value="42">42 (Pantalon/Pointure)</option>
-                <option value="44">44 (Pantalon/Pointure)</option>
-                <option value="Standard">Standard / Unique (مقاس موحد)</option>
-              </select>
+              <!-- Multi-Size Selector UI -->
+              <div style="flex: 2; display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; min-height: 20px; align-items: center;">
+                <span v-for="sz in ['S','M','L','XL','XXL','3XL','38','40','42','44','Standard']" :key="sz"
+                      @click="!v.sizes ? v.sizes=[sz] : (v.sizes.includes(sz) ? v.sizes = v.sizes.filter(x=>x!==sz) : v.sizes.push(sz))"
+                      :style="{ background: (v.sizes||[]).includes(sz) ? '#0071e3' : '#f8fafc', color: (v.sizes||[]).includes(sz) ? '#fff' : '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', userSelect: 'none', border: '1px solid ' + ((v.sizes||[]).includes(sz)?'#0071e3':'#e2e8f0'), fontWeight: '600' }">
+                  {{ sz }}
+                </span>
+                <span v-if="!v.sizes || v.sizes.length === 0" style="font-size: 11px; color: #94a3b8; margin-left: 4px;">Sélectionnez les tailles...</span>
+              </div>
               <input v-model.number="v.stock" type="number" placeholder="Stock" style="flex: 1;" />
               <button type="button" class="icon" @click="draft.variants.splice(i,1)" :disabled="draft.variants.length===1"><X :size="15"/></button>
             </div>

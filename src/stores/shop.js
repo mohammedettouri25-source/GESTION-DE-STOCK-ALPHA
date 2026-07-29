@@ -279,13 +279,28 @@ export const useShop = defineStore('shop', {
           hidden: Boolean(clean.hidden),
           price: Number(clean.price) || 0,
           purchasePrice: Number(clean.purchasePrice) || 0,
-          variants: (clean.variants || []).map((v, idx) => ({
-            ...v,
-            id: isUuid(v.id) ? v.id : crypto.randomUUID(),
-            barcode: (v.barcode && v.barcode.trim()) ? v.barcode.trim() : ((clean.barcode || autoBarcode) + String(idx + 1)),
-            stock: Number(v.stock) || 0,
-            min: Number(v.min) || 0
-          }))
+          variants: (clean.variants || []).flatMap((v, idx) => {
+            const hasMultiSizes = v.sizes && Array.isArray(v.sizes) && v.sizes.length > 0;
+            if (hasMultiSizes) {
+              return v.sizes.map((sz, sIdx) => ({
+                ...v,
+                size: sz,
+                sizes: undefined,
+                id: (v.sizes.length === 1 && isUuid(v.id)) ? v.id : crypto.randomUUID(),
+                barcode: (v.barcode && v.barcode.trim()) ? (v.sizes.length === 1 ? v.barcode.trim() : `${v.barcode.trim()}-${sz}`) : ((clean.barcode || autoBarcode) + `-${idx + 1}-${sz}`),
+                stock: Number(v.stock) || 0,
+                min: Number(v.min) || 0
+              }))
+            } else {
+              return [{
+                ...v,
+                id: isUuid(v.id) ? v.id : crypto.randomUUID(),
+                barcode: (v.barcode && v.barcode.trim()) ? v.barcode.trim() : ((clean.barcode || autoBarcode) + String(idx + 1)),
+                stock: Number(v.stock) || 0,
+                min: Number(v.min) || 0
+              }]
+            }
+          })
         }
         const plainP = cloneDeep(p)
         await localDb.products.put(plainP)

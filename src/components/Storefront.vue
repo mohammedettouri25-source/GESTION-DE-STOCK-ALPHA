@@ -22,52 +22,40 @@ function toggleLang() {
 
 // Hero Auto-Scroll Carousel State (Inspired by Pinterest aesthetics)
 const heroSlides = computed(() => {
+  const latestProducts = [...shop.products]
+    .filter(p => !p.hidden && (p.image || (p.images && p.images.length > 0)))
+    .reverse()
+    .slice(0, 3)
+
+  if (latestProducts.length > 0) {
+    return latestProducts.map(p => ({
+      eyebrow: currentLang.value === 'ar' ? 'جديد المتجر' : 'Nouveauté',
+      title: p.name,
+      subtitle: p.category,
+      image: p.image || (p.images && p.images[0]) || '',
+      category: p.category
+    }))
+  }
+
+  // Fallback if no products exist yet
   if (currentLang.value === 'ar') {
     return [
       {
-        eyebrow: 'تشكيلة الشارع العصرية 2026',
-        title: 'قميص أزرق وشورت برمودا',
-        subtitle: 'قصة واسعة مريحة (Relaxed Fit) مع تشطيبات عالية الجودة.',
+        eyebrow: 'تشكيلة المتجر العصرية',
+        title: 'أهلاً بك في المتجر',
+        subtitle: 'سيتم عرض أحدث المنتجات هنا فور إضافتها.',
         image: '/hero-slider-3.jpg',
-        category: 'Chemises'
-      },
-      {
-        eyebrow: 'مجموعة صيف 2026 الجديدة',
-        title: 'تيشيرت أوفرسايز وشورت',
-        subtitle: 'ستريت وير عصري وتصميم مينيماليست أنيق.',
-        image: '/hero-slider-1.jpg',
-        category: 'T-Shirts & Polos'
-      },
-      {
-        eyebrow: 'إطلالة الصيف الأنيقة',
-        title: 'قميص مفتوح وشورت جينز',
-        subtitle: 'أناقة صيفية خفيفة ومريحة.',
-        image: '/hero-slider-2.jpg',
-        category: 'Chemises'
+        category: 'Accueil'
       }
     ]
   }
   return [
     {
-      eyebrow: 'Urban Streetwear 2026',
-      title: 'Chemise Bleue & Bermuda',
-      subtitle: 'Coupe relaxed fit & finitions haut de gamme.',
+      eyebrow: 'Nouvelle Collection',
+      title: 'Bienvenue sur la boutique',
+      subtitle: 'Vos produits les plus récents s\'afficheront ici.',
       image: '/hero-slider-3.jpg',
-      category: 'Chemises'
-    },
-    {
-      eyebrow: 'Nouvelle Collection 2026',
-      title: 'T-Shirt Heavyweight & Shorts',
-      subtitle: 'Style urban minimalist Oversize.',
-      image: '/hero-slider-1.jpg',
-      category: 'T-Shirts & Polos'
-    },
-    {
-      eyebrow: 'Pinterest Summer Vibe',
-      title: 'Chemise Ouverte & Denim Shorts',
-      subtitle: 'Élégance décontractée d\'été.',
-      image: '/hero-slider-2.jpg',
-      category: 'Chemises'
+      category: 'Accueil'
     }
   ]
 })
