@@ -438,7 +438,7 @@ const blank = () => {
     hidden: false,
     image: '',
     images: [],
-    variants: [{ presetColor: 'Noir', color: 'Noir', size: 'M', stock: 10, min: 2, barcode: autoBarcode + '1', image: '' }]
+    variants: [{ presetColor: 'Noir', color: 'Noir', size: 'M', stock: 10, min: 2, barcode: autoBarcode + '1', images: [] }]
   }
 }
 const draft = ref(blank())
@@ -451,17 +451,23 @@ function triggerVariantImageUpload(idx) {
   }
 }
 
-function handleVariantImage(e, idx) {
-  const file = e.target.files[0]
-  if (!file) return
-  if (file.size > 2 * 1024 * 1024) return shop.notify('Image trop volumineuse (max 2MB)')
-  const reader = new FileReader()
-  reader.onload = (event) => {
-    if (draft.value && draft.value.variants && draft.value.variants[idx]) {
-      draft.value.variants[idx].image = event.target.result
-    }
+async function handleVariantImage(e, idx) {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+  if (!draft.value.variants[idx].images) draft.value.variants[idx].images = []
+
+  for (const file of files) {
+    try {
+      const compressed = await compressImage(file)
+      draft.value.variants[idx].images.push(compressed)
+    } catch (_) {}
   }
-  reader.readAsDataURL(file)
+  // Clear input so same file can be selected again
+  e.target.value = ''
+}
+
+function removeVariantImage(vIdx, imgIdx) {
+  draft.value.variants[vIdx].images.splice(imgIdx, 1)
 }
 
 function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.75) {
@@ -1239,6 +1245,9 @@ function edit(p) {
         if (!v.color) v.presetColor = ''
         else if (presetColors.includes(v.color)) v.presetColor = v.color
         else v.presetColor = 'Autre'
+        
+        // Migrate legacy variant image to images array
+        if (!v.images) v.images = v.image ? [v.image] : []
       })
     }
     
@@ -2853,13 +2862,20 @@ onMounted(async () => {
               <button type="button" class="icon" @click="draft.variants.splice(i,1)" :disabled="draft.variants.length===1"><X :size="15"/></button>
             </div>
             
-            <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
-              <button type="button" class="btn secondary" @click="triggerVariantImageUpload(i)" style="padding: 4px 10px; font-size: 12px; display: flex; align-items: center;">
-                <Image :size="14" style="margin-right:4px;" /> Image de la couleur
-              </button>
-              <img v-if="v.image" :src="v.image" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1;" />
-              <button v-if="v.image" type="button" class="icon" style="color:#dc2626; margin-left: -5px;" @click="v.image = ''"><X :size="14" /></button>
-              <input :ref="el => variantImageInputs[i] = el" type="file" accept="image/*" style="display:none" @change="e => handleVariantImage(e, i)" />
+            <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <button type="button" class="btn secondary" @click="triggerVariantImageUpload(i)" style="padding: 4px 10px; font-size: 12px; display: flex; align-items: center;">
+                  <Image :size="14" style="margin-right:4px;" /> Images de la couleur ({{ v.images ? v.images.length : 0 }})
+                </button>
+                <input :ref="el => variantImageInputs[i] = el" type="file" multiple accept="image/*" style="display:none" @change="e => handleVariantImage(e, i)" />
+              </div>
+              
+              <div v-if="v.images && v.images.length > 0" style="display:flex; gap:6px; flex-wrap:wrap;">
+                <div v-for="(img, imgIdx) in v.images" :key="imgIdx" style="position:relative; width:48px; height:48px; border-radius:6px; overflow:hidden; border:1px solid #cbd5e1;">
+                  <img :src="img" style="width:100%; height:100%; object-fit:cover;" />
+                  <button type="button" @click="removeVariantImage(i, imgIdx)" style="position:absolute; top:2px; right:2px; background:rgba(220,38,38,0.9); color:#fff; border:none; border-radius:50%; width:16px; height:16px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:10px;" title="Supprimer">✕</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

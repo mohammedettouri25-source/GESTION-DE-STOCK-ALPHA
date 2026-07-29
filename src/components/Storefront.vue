@@ -262,13 +262,20 @@ const filteredProducts = computed(() => {
 // Single Product Page Helpers
 const selectedColor = ref('')
 
+const activeProductImages = computed(() => {
+  if (!activeProduct.value) return []
+  if (selectedVariant.value && selectedVariant.value.images && selectedVariant.value.images.length > 0) {
+    return selectedVariant.value.images
+  }
+  if (selectedVariant.value && selectedVariant.value.image) {
+    return [selectedVariant.value.image]
+  }
+  return getProductImagesList(activeProduct.value)
+})
+
 const currentDisplayImage = computed(() => {
   if (!activeProduct.value) return ''
-  const baseImages = getProductImagesList(activeProduct.value)
-  if (selectedVariant.value && selectedVariant.value.image && activeImageIndex.value === 0) {
-    return selectedVariant.value.image
-  }
-  return baseImages[activeImageIndex.value] || getProductImage(activeProduct.value)
+  return activeProductImages.value[activeImageIndex.value] || activeProductImages.value[0] || getProductImage(activeProduct.value)
 })
 
 const availableColors = computed(() => {
@@ -363,7 +370,10 @@ function onColorSelect(color) {
   if (activeProduct.value && Array.isArray(activeProduct.value.variants)) {
     const matched = activeProduct.value.variants.find(v => v.color === color && v.stock > 0) ||
                     activeProduct.value.variants.find(v => v.color === color)
-    if (matched) selectedVariant.value = matched
+    if (matched) {
+      selectedVariant.value = matched
+      activeImageIndex.value = 0
+    }
   }
 }
 
@@ -827,9 +837,9 @@ function getProductImagesList(product) {
           </div>
 
           <!-- Thumbnails Selector Gallery -->
-          <div v-if="getProductImagesList(activeProduct).length > 1" class="thumbnails-bar">
+          <div v-if="activeProductImages.length > 1" class="thumbnails-bar">
             <img 
-              v-for="(img, idx) in getProductImagesList(activeProduct)" 
+              v-for="(img, idx) in activeProductImages" 
               :key="idx"
               :src="img"
               @click="activeImageIndex = idx"
@@ -877,7 +887,7 @@ function getProductImagesList(product) {
               <button 
                 v-for="v in filteredVariantsByColor" 
                 :key="v.id"
-                @click="selectedVariant = v"
+                @click="selectedVariant = v; activeImageIndex = 0"
                 :disabled="v.stock <= 0"
                 :class="[
                   'size-btn',
