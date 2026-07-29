@@ -27,13 +27,17 @@ let openaiClient = null;
 // Simple memory store to keep track of chat history per user
 const chatHistory = new Map();
 
+// Catch uncaught exceptions to prevent crashing the Node process
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err.message);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection:', reason);
+});
+
 // Initialize WhatsApp Client with LocalAuth so the session is saved
 const client = new Client({
     authStrategy: new LocalAuth(),
-    webVersionCache: {
-        type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html'
-    },
     puppeteer: {
         headless: true,
         args: [
