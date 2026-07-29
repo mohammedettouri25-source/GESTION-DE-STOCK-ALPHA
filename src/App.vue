@@ -728,7 +728,7 @@ function disconnectWa() {
 }
 
 function initWhatsAppSocket() {
-  waSocket = io('http://localhost:3001')
+  waSocket = io(import.meta.env.VITE_WHATSAPP_BACKEND_URL || 'http://localhost:3001')
   
   waSocket.on('status', (data) => {
     isWaPaired.value = data.isConnected
@@ -799,7 +799,7 @@ function initWhatsAppSocket() {
 }
 
 function pushSettingsToBackend() {
-  fetch('http://localhost:3001/bot-settings', {
+  fetch((import.meta.env.VITE_WHATSAPP_BACKEND_URL || 'http://localhost:3001') + '/bot-settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -925,7 +925,7 @@ async function sendInboxMessage(customText = null) {
 
   if (isWaPaired.value) {
     // Send via real WhatsApp backend
-    fetch('http://localhost:3001/send-message', {
+    fetch((import.meta.env.VITE_WHATSAPP_BACKEND_URL || 'http://localhost:3001') + '/send-message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
