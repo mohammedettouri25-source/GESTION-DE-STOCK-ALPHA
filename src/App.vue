@@ -446,29 +446,28 @@ const draft = ref(blank())
 const variantImageInputs = ref([])
 const mainImageInput = ref(null)
 
-function triggerMainImageUpload() {
-  const el = document.getElementById('main-img-input')
-  if (el) el.click()
-}
-
-function triggerVariantImageUpload(idx) {
-  const el = document.getElementById('variant-img-input-' + idx)
-  if (el) el.click()
-}
-
 async function handleVariantImage(e, idx) {
-  const files = Array.from(e.target.files || [])
-  if (!files.length) return
-  if (!draft.value.variants[idx].images) draft.value.variants[idx].images = []
+  try {
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
+    const v = draft.value.variants[idx]
+    if (!v.images) v.images = []
 
-  for (const file of files) {
-    try {
-      const compressed = await compressImage(file)
-      draft.value.variants[idx].images.push(compressed)
-    } catch (_) {}
+    for (const file of files) {
+      try {
+        const compressed = await compressImage(file)
+        if (compressed) {
+          v.images.push(compressed)
+          if (!v.image) v.image = compressed
+        }
+      } catch (err) {
+        alert("Variant Compression Error: " + err.message)
+      }
+    }
+    if (e.target) e.target.value = ''
+  } catch (err) {
+    alert("Variant Upload Error: " + err.message)
   }
-  // Clear input so same file can be selected again
-  e.target.value = ''
 }
 
 function removeVariantImage(vIdx, imgIdx) {
@@ -512,19 +511,26 @@ function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.75) {
 }
 
 async function handleProductImageUpload(e) {
-  const files = Array.from(e.target.files || [])
-  if (!files.length) return
-  if (!draft.value.images) draft.value.images = []
+  try {
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
+    if (!draft.value.images) draft.value.images = []
 
-  for (const file of files) {
-    try {
-      const compressed = await compressImage(file)
-      draft.value.images.push(compressed)
-      if (!draft.value.image) draft.value.image = compressed
-    } catch (_) {}
+    for (const file of files) {
+      try {
+        const compressed = await compressImage(file)
+        if (compressed) {
+          draft.value.images.push(compressed)
+          if (!draft.value.image) draft.value.image = compressed
+        }
+      } catch (err) {
+        alert("Compression Error: " + err.message)
+      }
+    }
+    if (e.target) e.target.value = ''
+  } catch (err) {
+    alert("Upload Error: " + err.message)
   }
-  // Reset the input so the same file can be selected again
-  if (e.target) e.target.value = ''
 }
 
 function removeProductImage(index) {
@@ -2804,10 +2810,8 @@ onMounted(async () => {
             🖼️ Photos du Produit (Multi-Images / صور المنتج من جهازك)
           </label>
           <div style="border:2px dashed #cbd5e1; padding:12px; border-radius:12px; text-align:center; background:#f8fafc; position:relative;">
-            <input type="file" multiple accept="image/*" @change="handleProductImageUpload" id="main-img-input" style="opacity:0; position:absolute; width:1px; height:1px; z-index:-1;" />
-            <button type="button" @click="triggerMainImageUpload" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#2563eb; background:#ffffff; padding:8px 14px; border-radius:8px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
-              📁 Sélectionner des photos depuis l'appareil
-            </button>
+            <label style="display:block; margin-bottom: 8px; font-weight: bold; color: #2563eb;">Cliquez ci-dessous pour choisir des photos :</label>
+            <input type="file" multiple accept="image/*" @change="handleProductImageUpload" style="display:block; margin: 0 auto;" />
             <p style="font-size:11px; color:#64748b; margin-top:6px;">Vous pouvez ajouter plusieurs photos pour les afficher dans la carte du Storefront.</p>
           </div>
 
@@ -2870,10 +2874,8 @@ onMounted(async () => {
             
             <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
               <div style="display: flex; align-items: center; gap: 10px; position:relative;">
-                <button type="button" class="btn secondary" @click="triggerVariantImageUpload(i)" style="padding: 4px 10px; font-size: 12px; display: flex; align-items: center;">
-                  <Image :size="14" style="margin-right:4px;" /> Images de la couleur ({{ v.images ? v.images.length : 0 }})
-                </button>
-                <input :id="'variant-img-input-' + i" type="file" multiple accept="image/*" style="opacity:0; position:absolute; width:1px; height:1px; z-index:-1;" @change="e => handleVariantImage(e, i)" />
+                <label style="font-size: 11px; font-weight: bold; color: #475569;">Images de la couleur ({{ v.images ? v.images.length : 0 }}) :</label>
+                <input type="file" multiple accept="image/*" @change="e => handleVariantImage(e, i)" />
               </div>
               
               <div v-if="v.images && v.images.length > 0" style="display:flex; gap:6px; flex-wrap:wrap;">
