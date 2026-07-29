@@ -1,0 +1,185 @@
+require('dotenv').config();
+const express = require('express');
+const { Server } = require('socket.io');
+const http = require('http');
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
+const cors = require('cors');
+const OpenAI = require('openai');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: '*',
+        methods: ['GET', 'POST']
+    }
+});
+
+let botEnabled = false;
+let systemPrompt = '';
+let openaiKey = '';
+let openaiClient = null;
+
+// Simple memory store to keep track of chat history per user
+const chatHistory = new Map();
+
+// Initialize WhatsApp Client with LocalAuth so the session is saved
+const client = new Client({
+    authStrategy: new LocalAuth(),
+    webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html'
+    },
+    puppeteer: {
+        headless: true,
+        args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox',
+            '--disable-extensions',
+            '--disable-dev-shm-usage',
+            '--disable-gpu'
+        ],
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+});
+
+let qrCodeData = null;
+let isConnected = false;
+
+client.on('qr', (qr) => {
+    // Generate and scan this code with your phone
+    qrcode.generate(qr, { small: true });
+    qrCodeData = qr;
+    io.emit('qr', qr);
+    console.log('QR Code generated. Scan it with WhatsApp.');
+});
+
+client.on('ready', () => {
+    console.log('Client is ready!');
+    isConnected = true;
+    qrCodeData = null;
+    io.emit('ready');
+});
+
+client.on('authenticated', () => {
+    console.log('AUTHENTICATED');
+});
+
+client.on('auth_failure', msg => {
+    console.error('AUTHENTICATION FAILURE', msg);
+    io.emit('auth_failure', msg);
+});
+
+client.on('disconnected', (reason) => {
+    console.log('Client was logged out', reason);
+    isConnected = false;
+    io.emit('disconnected', reason);
+});
+
+client.on('message', async msg => {
+    console.log(`MESSAGE RECEIVED from ${msg.from}: ${msg.body}`);
+    io.emit('message', {
+        from: msg.from,
+        body: msg.body,
+        isGroup: msg.isGroupMsg
+    });
+
+    if (botEnabled && !msg.isGroupMsg && openaiClient) {
+        try {
+            // Retrieve history
+            if (!chatHistory.has(msg.from)) {
+                chatHistory.set(msg.from, [
+                    { role: 'system', content: systemPrompt }
+                ]);
+            }
+            
+            const history = chatHistory.get(msg.from);
+            history.push({ role: 'user', content: msg.body });
+            
+            // Limit history to last 10 messages to save tokens
+            if (history.length > 11) {
+                // Keep the system prompt at index 0, and slice the rest
+                const recent = history.slice(history.length - 10);
+                chatHistory.set(msg.from, [history[0], ...recent]);
+            }
+
+            const response = await openaiClient.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages: chatHistory.get(msg.from),
+                temperature: 0.7,
+                max_tokens: 300,
+            });
+
+            const replyText = response.choices[0].message.content;
+            history.push({ role: 'assistant', content: replyText });
+            
+            // Send reply to user
+            await client.sendMessage(msg.from, replyText);
+            
+            // Also notify the frontend about the AI reply
+            io.emit('message', {
+                from: 'AI_BOT',
+                to: msg.from,
+                body: replyText,
+                isGroup: false
+            });
+
+        } catch (error) {
+            console.error('OpenAI Error:', error.message);
+        }
+    }
+});
+
+// API Routes
+app.get('/status', (req, res) => {
+    res.json({ isConnected, qr: qrCodeData });
+});
+
+app.post('/bot-settings', (req, res) => {
+    const { enabled, prompt, apiKey } = req.body;
+    botEnabled = enabled;
+    systemPrompt = prompt;
+    openaiKey = apiKey;
+    
+    if (apiKey && apiKey.startsWith('sk-')) {
+        openaiClient = new OpenAI({ apiKey: openaiKey });
+    }
+    
+    console.log('Bot settings updated:', { enabled, hasApiKey: !!apiKey });
+    res.json({ success: true });
+});
+
+app.post('/send-message', async (req, res) => {
+    const { phone, message } = req.body;
+    if (!isConnected) return res.status(400).json({ error: 'Client not connected' });
+    
+    try {
+        const chatId = phone.includes('@c.us') ? phone : `${phone}@c.us`;
+        await client.sendMessage(chatId, message);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+io.on('connection', (socket) => {
+    console.log('Frontend connected via WebSocket');
+    
+    socket.emit('status', { isConnected, qr: qrCodeData });
+
+    socket.on('disconnect', () => {
+        console.log('Frontend disconnected');
+    });
+});
+
+const PORT = process.env.PORT || 3001;
+
+client.initialize();
+
+server.listen(PORT, () => {
+    console.log(`WhatsApp Backend Server is running on port ${PORT}`);
+});

@@ -479,7 +479,7 @@ function addToCart(product, variant = null, buyNow = false) {
 // Complete Order
 async function submitOrder() {
   if (!orderForm.value.name.trim()) return shop.notify('Veuillez entrer votre nom complet')
-  if (!orderForm.value.phone.trim() || orderForm.value.phone.length < 9) return shop.notify('Veuillez entrer un numéro de téléphone valide (06/07...)')
+  if (!/^(06|07|05)[0-9]{8}$/.test(orderForm.value.phone.trim())) return shop.notify('Veuillez entrer un numéro de téléphone marocain valide (10 chiffres, ex: 0612345678)')
   if (!orderForm.value.city) return shop.notify('Veuillez choisir votre ville')
   if (!orderForm.value.address.trim()) return shop.notify('Veuillez entrer votre adresse de livraison')
   if (!shop.cart.length) return shop.notify('Votre panier est vide')
@@ -506,6 +506,7 @@ async function submitOrder() {
     }
 
     const cartSnapshot = JSON.parse(JSON.stringify(shop.cart))
+    const totalAmount = cartTotal.value
     await shop.checkout('Paiement à la livraison (COD)', details)
 
     orderSuccess.value = {
@@ -514,7 +515,7 @@ async function submitOrder() {
       phone: orderForm.value.phone,
       city: orderForm.value.city,
       address: orderForm.value.address,
-      total: cartTotal.value,
+      total: totalAmount,
       items: cartSnapshot
     }
 
@@ -1050,6 +1051,8 @@ function getProductImagesList(product) {
               v-model="orderForm.phone"
               type="tel" 
               required
+              pattern="^(06|07|05)[0-9]{8}$"
+              title="Numéro marocain (ex: 0612345678)"
               placeholder="06XX-XXXXXX"
             />
           </div>

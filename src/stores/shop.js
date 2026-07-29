@@ -445,6 +445,7 @@ export const useShop = defineStore('shop', {
           remainingBalance,
           customer: details.customer ? cloneDeep(details.customer) : null,
           payment,
+          type: details.saleType || (details.source === 'storefront' ? 'online' : 'offline'),
           source: details.source || 'pos',
           status: details.status || (details.source === 'storefront' ? 'unconfirmed' : 'completed'),
           confirmed: details.source === 'storefront' ? false : true

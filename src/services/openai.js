@@ -2,7 +2,7 @@
  * OpenAI ChatGPT API Integration Service for WhatsApp Chatbot
  */
 export async function generateOpenAiChatReply({ apiKey, systemPrompt, conversationHistory, shopContext }) {
-  const validKey = apiKey || localStorage.getItem('openai-api-key') || import.meta.env.VITE_OPENAI_API_KEY
+  const validKey = apiKey || localStorage.getItem('openai-api-key')
 
   if (!validKey) {
     throw new Error('Clé API OpenAI manquante. Veuillez saisir votre clé API OpenAI dans la rubrique WhatsApp & Bot AI.')

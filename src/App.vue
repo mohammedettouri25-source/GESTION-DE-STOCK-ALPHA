@@ -6,6 +6,8 @@ import { LayoutDashboard, Package, ShoppingCart, ShoppingBag, Truck, Users, Fact
 import { createOzonParcel, getOzonParcelInfo } from './services/ozon'
 import { OZON_CITIES } from './services/ozonCities'
 import { generateOpenAiChatReply } from './services/openai'
+import { io } from 'socket.io-client'
+import QRCode from 'qrcode'
 
 const currentViewMode = ref(localStorage.getItem('alpha-view-mode') || 'storefront')
 
@@ -111,7 +113,7 @@ const aiModal = ref(false)
 const aiPrompt = ref('')
 const aiAnalyzing = ref(false)
 
-const SESSION_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
 const authenticated = ref(false)
 const loginPassword = ref('')
 const loginError = ref('')
@@ -129,9 +131,9 @@ function checkAuthSession() {
       authenticated.value = false
       localStorage.removeItem('alpha-auth')
       localStorage.removeItem('alpha-auth-time')
-      loginError.value = 'Session expirée (10 min). Veuillez vous reconnecter.'
+      loginError.value = 'Session expirée (30 min). Veuillez vous reconnecter.'
       if (authTime) {
-        shop.notify('Session expirée après 10 minutes. Reconnexion requise.')
+        shop.notify('Session expirée après 30 minutes. Reconnexion requise.')
       }
       return false
     }
@@ -698,34 +700,114 @@ function onTouchMoveChart(e) {
 }
 
 // --- WhatsApp Business & OpenAI ChatGPT Integration State ---
-const openaiKey = ref(localStorage.getItem('openai-api-key') || import.meta.env.VITE_OPENAI_API_KEY || '')
+const openaiKey = ref(localStorage.getItem('openai-api-key') || '')
 const waSubTab = ref('inbox') // 'inbox' | 'config'
 
 const showWaQrModal = ref(false)
-const isWaPaired = ref(localStorage.getItem('alpha-wa-paired') === 'true')
+const isWaPaired = ref(false)
 const pairedPhone = ref(localStorage.getItem('alpha-wa-paired-phone') || '212641432859')
 const qrScanning = ref(false)
+const waQrCodeUrl = ref(null)
+
+let waSocket = null
 
 function openWaQrModal() {
   showWaQrModal.value = true
 }
 
 function confirmWaPairing() {
-  qrScanning.value = true
-  setTimeout(() => {
-    isWaPaired.value = true
-    localStorage.setItem('alpha-wa-paired', 'true')
-    localStorage.setItem('alpha-wa-paired-phone', whatsappSettings.value.phone || '212641432859')
-    qrScanning.value = false
-    showWaQrModal.value = false
-    shop.notify('🟢 WhatsApp (212641432859) connecté avec succès via Appareils Connectés !')
-  }, 1200)
+  // This is no longer a simulated timeout. The real QR will disappear when scanned.
+  shop.notify('Veuillez scanner le QR Code depuis votre application WhatsApp')
 }
 
 function disconnectWa() {
   isWaPaired.value = false
   localStorage.setItem('alpha-wa-paired', 'false')
   shop.notify('WhatsApp déconnecté')
+  // Tell backend to logout if necessary, although usually you logout from phone.
+}
+
+function initWhatsAppSocket() {
+  waSocket = io('http://localhost:3001')
+  
+  waSocket.on('status', (data) => {
+    isWaPaired.value = data.isConnected
+    if (data.qr) {
+      QRCode.toDataURL(data.qr, (err, url) => {
+        if (!err) waQrCodeUrl.value = url
+      })
+    }
+  })
+
+  waSocket.on('qr', (qr) => {
+    QRCode.toDataURL(qr, (err, url) => {
+      if (!err) {
+        waQrCodeUrl.value = url
+        qrScanning.value = false
+      }
+    })
+  })
+
+  waSocket.on('ready', () => {
+    isWaPaired.value = true
+    waQrCodeUrl.value = null
+    showWaQrModal.value = false
+    shop.notify('🟢 WhatsApp connecté avec succès !')
+    pushSettingsToBackend()
+  })
+
+  waSocket.on('disconnected', () => {
+    isWaPaired.value = false
+    waQrCodeUrl.value = null
+    shop.notify('WhatsApp déconnecté du serveur')
+  })
+
+  waSocket.on('message', (msg) => {
+    // We handle live messages here
+    console.log('WhatsApp message received:', msg)
+    const isBot = msg.from === 'AI_BOT'
+    const contactPhone = isBot ? msg.to.split('@')[0] : msg.from.split('@')[0]
+    
+    // Ignore group chats
+    if (msg.isGroup) return
+
+    // Find or create conversation
+    let conv = waConversations.value.find(c => c.phone === contactPhone)
+    if (!conv) {
+      conv = {
+        id: 'conv-' + contactPhone,
+        customerName: `الزبون (${contactPhone})`,
+        phone: contactPhone,
+        orderNumber: '',
+        unreadCount: 0,
+        lastTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        messages: []
+      }
+      waConversations.value.unshift(conv)
+    }
+
+    conv.messages.push({
+      sender: isBot ? 'bot' : 'user',
+      text: msg.body
+    })
+
+    conv.lastTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    if (!isBot && activeWaConvId.value !== conv.id) {
+      conv.unreadCount++
+    }
+  })
+}
+
+function pushSettingsToBackend() {
+  fetch('http://localhost:3001/bot-settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      enabled: whatsappSettings.value.autoReply,
+      prompt: whatsappSettings.value.aiPrompt,
+      apiKey: openaiKey.value
+    })
+  }).catch(e => console.error('Failed to push bot settings', e))
 }
 
 const whatsappSettings = ref({
@@ -744,6 +826,7 @@ function saveWhatsappSettings() {
   localStorage.setItem('alpha-wa-token', whatsappSettings.value.token)
   localStorage.setItem('alpha-wa-phoneid', whatsappSettings.value.phoneId)
   localStorage.setItem('alpha-wa-prompt', whatsappSettings.value.aiPrompt)
+  pushSettingsToBackend()
   shop.notify('Paramètres WhatsApp & Clé API OpenAI enregistrés ✓')
 }
 
@@ -835,50 +918,64 @@ async function sendInboxMessage(customText = null) {
   const text = customText || inboxInput.value.trim()
   if (!text) return
 
-  conv.messages.push({ sender: 'user', text })
+  // Push merchant message locally
+  conv.messages.push({ sender: 'bot', text })
   if (!customText) inboxInput.value = ''
   conv.lastTime = 'À l\'instant'
-  inboxSending.value = true
 
-  try {
-    let botReply = ''
-    if (whatsappSettings.value.autoReply && openaiKey.value && openaiKey.value.startsWith('sk-')) {
-      // Real OpenAI ChatGPT API Call!
-      botReply = await generateOpenAiChatReply({
-        apiKey: openaiKey.value,
-        systemPrompt: whatsappSettings.value.aiPrompt,
-        conversationHistory: conv.messages,
-        shopContext: { products: shop.products, sales: shop.sales }
+  if (isWaPaired.value) {
+    // Send via real WhatsApp backend
+    fetch('http://localhost:3001/send-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: conv.phone,
+        message: text
       })
-    } else {
-      // Local AI fallback
-      const lower = text.toLowerCase()
-      if (lower.includes('تأكيد') || lower.includes('نأكد') || lower.includes('1') || lower.includes('confirm') || lower.includes('al-')) {
-        const targetSale = shop.sales.find(s => String(s.number).includes(conv.orderNumber) || String(s.customer?.phone).includes(conv.phone)) || shop.sales[0]
-        if (targetSale) {
-          await shop.confirmSaleStatus(targetSale.id, 'confirmée')
-          botReply = `✅ تم تأكيد الطلبية رقم #${targetSale.number || targetSale.id} بنجاح! 🚀 المجموع: ${targetSale.total} MAD. سيتم التسليم عبر Ozon Express.`
-        } else {
-          botReply = `شكراً لتأكيدك! 📦 تم تسجيل تأكيد طلبك.`
-        }
-      } else if (lower.includes('ثمن') || lower.includes('سعر') || lower.includes('prix') || lower.includes('شحال')) {
-        const p = shop.products[0]
-        botReply = p ? `🏷️ منتج ${p.name}: الثمن ${p.price} MAD. المخزون متوفر حالياً!` : 'أهلاً بك! يمكنك الاستفسار عن أي منتج فـ متجرنا.'
+    }).catch(e => console.error('Failed to send WhatsApp message', e))
+  } else {
+    // Simulated Local AI reply fallback if not paired
+    inboxSending.value = true
+    try {
+      let botReply = ''
+      if (whatsappSettings.value.autoReply && openaiKey.value && openaiKey.value.startsWith('sk-')) {
+        // Simulated OpenAI ChatGPT API Call!
+        botReply = await generateOpenAiChatReply({
+          apiKey: openaiKey.value,
+          systemPrompt: whatsappSettings.value.aiPrompt,
+          conversationHistory: conv.messages,
+          shopContext: { products: shop.products, sales: shop.sales }
+        })
       } else {
-        botReply = `أهلاً بك! 👋 أنا مساعد الذكاء الاصطناعي لـ Alpha Shop (يرجى إدخال Clé API OpenAI فـ الإعدادات لتأكيد الرد عبر ChatGPT).`
+        // Local AI fallback
+        const lower = text.toLowerCase()
+        if (lower.includes('تأكيد') || lower.includes('نأكد') || lower.includes('1') || lower.includes('confirm') || lower.includes('al-')) {
+          const targetSale = shop.sales.find(s => String(s.number).includes(conv.orderNumber) || String(s.customer?.phone).includes(conv.phone)) || shop.sales[0]
+          if (targetSale) {
+            await shop.confirmSaleStatus(targetSale.id, 'confirmée')
+            botReply = `✅ تم تأكيد الطلبية رقم #${targetSale.number || targetSale.id} بنجاح! 🚀 المجموع: ${targetSale.total} MAD. سيتم التسليم عبر Ozon Express.`
+          } else {
+            botReply = `شكراً لتأكيدك! 📦 تم تسجيل تأكيد طلبك.`
+          }
+        } else if (lower.includes('ثمن') || lower.includes('سعر') || lower.includes('prix') || lower.includes('شحال')) {
+          const p = shop.products[0]
+          botReply = p ? `🏷️ منتج ${p.name}: الثمن ${p.price} MAD. المخزون متوفر حالياً!` : 'أهلاً بك! يمكنك الاستفسار عن أي منتج فـ متجرنا.'
+        } else {
+          botReply = `أهلاً بك! 👋 أنا مساعد الذكاء الاصطناعي لـ Alpha Shop (يرجى إدخال Clé API OpenAI فـ الإعدادات لتأكيد الرد عبر ChatGPT).`
+        }
       }
-    }
 
-    conv.messages.push({ sender: 'bot', text: botReply })
+      conv.messages.push({ sender: 'bot', text: botReply })
 
-    if (botReply.includes('تم تأكيد الطلبية')) {
-      const sale = shop.sales.find(s => String(s.number).includes(conv.orderNumber) || String(s.customer?.phone).includes(conv.phone))
-      if (sale) await shop.confirmSaleStatus(sale.id, 'confirmée')
+      if (botReply.includes('تم تأكيد الطلبية')) {
+        const sale = shop.sales.find(s => String(s.number).includes(conv.orderNumber) || String(s.customer?.phone).includes(conv.phone))
+        if (sale) await shop.confirmSaleStatus(sale.id, 'confirmée')
+      }
+    } catch (err) {
+      conv.messages.push({ sender: 'bot', text: `⚠️ OpenAI Error: ${err.message}` })
+    } finally {
+      inboxSending.value = false
     }
-  } catch (err) {
-    conv.messages.push({ sender: 'bot', text: `⚠️ OpenAI Error: ${err.message}` })
-  } finally {
-    inboxSending.value = false
   }
 }
 
@@ -1066,6 +1163,10 @@ const dailyProfitsReport = computed(() => {
     
     if (sale.source === 'storefront' || sale.type === 'online') {
       dayData.onlineRevenue += Number(sale.total) || 0
+      
+      // Add fixed 40 DH Ozon shipping cost to COGS so it is deducted from profit
+      dayData.cogs += 40
+      dayData.onlineCogs += 40
     } else {
       dayData.offlineRevenue += Number(sale.total) || 0
     }
@@ -1162,6 +1263,8 @@ const profitSummary = computed(() => {
   let expenses = 0
   let salesCount = 0
   let itemsCount = 0
+  let onlineProfit = 0
+  let offlineProfit = 0
 
   dailyProfitsReport.value.forEach(d => {
     revenue += d.revenue
@@ -1169,13 +1272,15 @@ const profitSummary = computed(() => {
     expenses += d.expenses
     salesCount += d.salesCount
     itemsCount += d.itemsCount
+    onlineProfit += d.onlineProfit
+    offlineProfit += d.offlineProfit
   })
 
   const grossProfit = revenue - cogs
   const netProfit = grossProfit - expenses
   const margin = revenue > 0 ? ((netProfit / revenue) * 100).toFixed(1) : 0
 
-  return { revenue, cogs, expenses, grossProfit, netProfit, margin, salesCount, itemsCount }
+  return { revenue, cogs, expenses, grossProfit, netProfit, margin, salesCount, itemsCount, onlineProfit, offlineProfit }
 })
 
 const topProfitableProducts = computed(() => {
@@ -1548,8 +1653,13 @@ const orderTotal = computed(() => Math.max(0, shop.cartTotal - (Number(order.val
 
 async function submitOrder() {
   const c = order.value.customer, o = order.value.ozon
-  if (order.value.sendOzon && order.value.type === 'online' && (!c.name || !c.phone || (!c.cityId && !c.city) || !c.address)) {
-    return shop.notify('Veuillez renseigner le nom, téléphone, ville et adresse du client')
+  if (order.value.sendOzon && order.value.type === 'online') {
+    if (!c.name || !c.phone || (!c.cityId && !c.city) || !c.address) {
+      return shop.notify('Veuillez renseigner le nom, téléphone, ville et adresse du client')
+    }
+    if (!/^(06|07|05)[0-9]{8}$/.test(c.phone.trim())) {
+      return shop.notify('Veuillez entrer un numéro de téléphone marocain valide (ex: 0612345678)')
+    }
   }
   submitting.value = true
   try {
@@ -1633,6 +1743,10 @@ onMounted(async () => {
       checkAuthSession()
     }
   }, 10000)
+
+  if (authenticated.value) {
+    initWhatsAppSocket()
+  }
 
   await shop.init()
   const params = new URLSearchParams(window.location.search)
@@ -2383,10 +2497,10 @@ onMounted(async () => {
             <em class="badge-profit">Marge Nette : {{ profitSummary.margin }} %</em>
             <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.1); font-size: 11px; display: flex; flex-direction: column; gap: 4px;">
               <span style="display:flex; justify-content:space-between; color:#ea580c">
-                <span>Online (Brut)</span> <b>{{ money(profitSummary.onlineProfit) }}</b>
+                <span>Online (Net)</span> <b>{{ money(profitSummary.onlineProfit) }}</b>
               </span>
               <span style="display:flex; justify-content:space-between; color:#3b82f6">
-                <span>Magasin (Brut)</span> <b>{{ money(profitSummary.offlineProfit) }}</b>
+                <span>Magasin (Net)</span> <b>{{ money(profitSummary.offlineProfit) }}</b>
               </span>
             </div>
           </article>
@@ -2433,8 +2547,8 @@ onMounted(async () => {
                   <strong :class="d.netProfit >= 0 ? 'profit-pill-success' : 'profit-pill-danger'">
                     {{ d.netProfit >= 0 ? '+' : '' }}{{ money(d.netProfit) }}
                   </strong>
-                  <div style="font-size:10px; color:#ea580c; text-align:left; line-height: 1.1; margin-top:2px;">Online (Brut): {{ money(d.onlineProfit) }}</div>
-                  <div style="font-size:10px; color:#3b82f6; text-align:left; line-height: 1.1;">Magasin (Brut): {{ money(d.offlineProfit) }}</div>
+                  <div style="font-size:10px; color:#ea580c; text-align:left; line-height: 1.1; margin-top:2px;">Online (Net): {{ money(d.onlineProfit) }}</div>
+                  <div style="font-size:10px; color:#3b82f6; text-align:left; line-height: 1.1;">Magasin (Net): {{ money(d.offlineProfit) }}</div>
                 </span>
                 <span><b>{{ d.margin }} %</b></span>
                 <button class="icon quiet">
@@ -3109,7 +3223,7 @@ onMounted(async () => {
 
         <div class="two">
           <label>Nom complet<input v-model="order.customer.name" :placeholder="order.type==='offline' ? 'Client Comptoir (Optionnel)' : 'Mohammed Alami'" :required="order.sendOzon && order.type === 'online'"/></label>
-          <label>Téléphone<input v-model="order.customer.phone" placeholder="0612345678" :required="order.sendOzon && order.type === 'online'"/></label>
+          <label>Téléphone<input v-model="order.customer.phone" placeholder="0612345678" pattern="^(06|07|05)[0-9]{8}$" title="Numéro marocain (ex: 0612345678)" :required="order.sendOzon && order.type === 'online'"/></label>
         </div>
 
         <div v-if="order.type === 'online'" class="two">
@@ -3647,62 +3761,17 @@ onMounted(async () => {
           <!-- QR Code Renderer Box -->
           <div style="display:flex; flex-direction:column; align-items:center; background:#f8fafc; border:1px solid #cbd5e1; border-radius:12px; padding:16px; text-align:center;">
             <div style="position:relative; width:180px; height:180px; background:#ffffff; border-radius:10px; padding:10px; border:2px dashed #16a34a; margin-bottom:12px; display:grid; place-items:center;">
-              <!-- Simulated Authentic WhatsApp QR Code Pattern -->
-              <svg width="150" height="150" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="100" height="100" fill="white"/>
-                <!-- Corner Finder Patterns -->
-                <rect x="5" y="5" width="25" height="25" fill="#0f172a" rx="4"/>
-                <rect x="9" y="9" width="17" height="17" fill="white" rx="2"/>
-                <rect x="13" y="13" width="9" height="9" fill="#16a34a" rx="1"/>
-
-                <rect x="70" y="5" width="25" height="25" fill="#0f172a" rx="4"/>
-                <rect x="74" y="9" width="17" height="17" fill="white" rx="2"/>
-                <rect x="78" y="13" width="9" height="9" fill="#16a34a" rx="1"/>
-
-                <rect x="5" y="70" width="25" height="25" fill="#0f172a" rx="4"/>
-                <rect x="9" y="74" width="17" height="17" fill="white" rx="2"/>
-                <rect x="13" y="78" width="9" height="9" fill="#16a34a" rx="1"/>
-
-                <!-- Random QR Data Matrix Dots -->
-                <rect x="35" y="10" width="8" height="8" fill="#0f172a"/>
-                <rect x="48" y="10" width="8" height="8" fill="#16a34a"/>
-                <rect x="35" y="25" width="8" height="8" fill="#0f172a"/>
-                <rect x="48" y="25" width="8" height="8" fill="#0f172a"/>
-
-                <rect x="10" y="38" width="8" height="8" fill="#16a34a"/>
-                <rect x="25" y="38" width="8" height="8" fill="#0f172a"/>
-                <rect x="40" y="38" width="8" height="8" fill="#0f172a"/>
-                <rect x="55" y="38" width="8" height="8" fill="#16a34a"/>
-                <rect x="70" y="38" width="8" height="8" fill="#0f172a"/>
-
-                <rect x="10" y="52" width="8" height="8" fill="#0f172a"/>
-                <rect x="25" y="52" width="8" height="8" fill="#16a34a"/>
-                <rect x="40" y="52" width="8" height="8" fill="#0f172a"/>
-                <rect x="55" y="52" width="8" height="8" fill="#0f172a"/>
-                <rect x="70" y="52" width="8" height="8" fill="#16a34a"/>
-
-                <rect x="35" y="70" width="8" height="8" fill="#16a34a"/>
-                <rect x="48" y="70" width="8" height="8" fill="#0f172a"/>
-                <rect x="63" y="70" width="8" height="8" fill="#0f172a"/>
-                <rect x="78" y="70" width="8" height="8" fill="#16a34a"/>
-                <rect x="35" y="85" width="8" height="8" fill="#0f172a"/>
-                <rect x="48" y="85" width="8" height="8" fill="#16a34a"/>
-                <rect x="63" y="85" width="8" height="8" fill="#0f172a"/>
-                <rect x="78" y="85" width="8" height="8" fill="#0f172a"/>
-
-                <!-- WhatsApp Logo Badge in center -->
-                <circle cx="50" cy="50" r="12" fill="#16a34a"/>
-                <path d="M46 45C46 45 47 48 50 51C53 54 56 55 56 55" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-              </svg>
+              <!-- Real Dynamic WhatsApp QR Code -->
+              <img v-if="waQrCodeUrl" :src="waQrCodeUrl" alt="WhatsApp QR" style="max-width:100%; height:auto;" />
+              <span v-else style="color:#64748b; font-size:12px;">Chargement du QR...</span>
             </div>
 
             <button
               class="primary"
               style="background:#16a34a; border:none; width:100%; font-size:12px; padding:10px;"
-              :disabled="qrScanning"
-              @click="confirmWaPairing"
+              @click="showWaQrModal = false"
             >
-              <span v-if="!qrScanning">📷 تم المسح الضوئي (ربط 0641432859)</span>
+              <span v-if="!qrScanning">✅ Terminé</span>
               <span v-else>جاري الربط مع الهاتف... ⏳</span>
             </button>
           </div>
