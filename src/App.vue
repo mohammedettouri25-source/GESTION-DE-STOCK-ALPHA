@@ -506,6 +506,7 @@ function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.75) {
       img.onerror = () => resolve(e.target.result)
       img.src = e.target.result
     }
+    reader.onerror = () => resolve('')
     reader.readAsDataURL(file)
   })
 }
@@ -2802,8 +2803,8 @@ onMounted(async () => {
           <label style="display:block; font-size:12px; font-weight:700; margin-bottom:6px; color:#334155;">
             🖼️ Photos du Produit (Multi-Images / صور المنتج من جهازك)
           </label>
-          <div style="border:2px dashed #cbd5e1; padding:12px; border-radius:12px; text-align:center; background:#f8fafc;">
-            <input type="file" multiple accept="image/*" @change="handleProductImageUpload" id="main-img-input" style="display:none;" />
+          <div style="border:2px dashed #cbd5e1; padding:12px; border-radius:12px; text-align:center; background:#f8fafc; position:relative;">
+            <input type="file" multiple accept="image/*" @change="handleProductImageUpload" id="main-img-input" style="opacity:0; position:absolute; width:1px; height:1px; z-index:-1;" />
             <button type="button" @click="triggerMainImageUpload" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#2563eb; background:#ffffff; padding:8px 14px; border-radius:8px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
               📁 Sélectionner des photos depuis l'appareil
             </button>
@@ -2868,11 +2869,11 @@ onMounted(async () => {
             </div>
             
             <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
-              <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 10px; position:relative;">
                 <button type="button" class="btn secondary" @click="triggerVariantImageUpload(i)" style="padding: 4px 10px; font-size: 12px; display: flex; align-items: center;">
                   <Image :size="14" style="margin-right:4px;" /> Images de la couleur ({{ v.images ? v.images.length : 0 }})
                 </button>
-                <input :id="'variant-img-input-' + i" type="file" multiple accept="image/*" style="display:none" @change="e => handleVariantImage(e, i)" />
+                <input :id="'variant-img-input-' + i" type="file" multiple accept="image/*" style="opacity:0; position:absolute; width:1px; height:1px; z-index:-1;" @change="e => handleVariantImage(e, i)" />
               </div>
               
               <div v-if="v.images && v.images.length > 0" style="display:flex; gap:6px; flex-wrap:wrap;">
