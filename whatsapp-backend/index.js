@@ -174,11 +174,13 @@ app.get('/status', (req, res) => {
     res.json({ isConnected, qr: qrCodeData });
 });
 
-app.get('/reset-whatsapp', (req, res) => {
+app.get('/reset-whatsapp', async (req, res) => {
     const authFolder = path.join(__dirname, '.wwebjs_auth');
     try {
         if (client) {
-            client.destroy().catch(console.error);
+            await client.destroy().catch(console.error);
+            // Wait a moment for Chrome to fully close and release file locks
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
         if (fs.existsSync(authFolder)) {
             fs.rmSync(authFolder, { recursive: true, force: true });
