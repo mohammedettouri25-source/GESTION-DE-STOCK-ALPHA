@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useShop } from './stores/shop'
 import Storefront from './components/Storefront.vue'
-import { LayoutDashboard, Package, ShoppingCart, ShoppingBag, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText, Bot, Sparkles, Lock, LogOut, KeyRound, Eye, EyeOff, MessageCircle, Send, TrendingUp, Calendar, Download, ChevronDown, CheckCircle2 } from 'lucide-vue-next'
+import { LayoutDashboard, Package, ShoppingCart, ShoppingBag, Truck, Users, Factory, WalletCards, BarChart3, Settings, Search, Plus, Minus, X, ChevronRight, Wifi, WifiOff, Bell, Menu, MoreHorizontal, ArrowUpRight, AlertTriangle, Trash2, Printer, FileText, Bot, Sparkles, Lock, LogOut, KeyRound, Eye, EyeOff, MessageCircle, Send, TrendingUp, Calendar, Download, ChevronDown, CheckCircle2, Image } from 'lucide-vue-next'
 import { createOzonParcel, getOzonParcelInfo } from './services/ozon'
 import { OZON_CITIES } from './services/ozonCities'
 import { generateOpenAiChatReply } from './services/openai'
@@ -438,10 +438,31 @@ const blank = () => {
     hidden: false,
     image: '',
     images: [],
-    variants: [{ color: 'Noir', size: 'M', stock: 10, min: 2, barcode: autoBarcode + '1' }]
+    variants: [{ presetColor: 'Noir', color: 'Noir', size: 'M', stock: 10, min: 2, barcode: autoBarcode + '1', image: '' }]
   }
 }
 const draft = ref(blank())
+
+const variantImageInputs = ref([])
+
+function triggerVariantImageUpload(idx) {
+  if (variantImageInputs.value[idx]) {
+    variantImageInputs.value[idx].click()
+  }
+}
+
+function handleVariantImage(e, idx) {
+  const file = e.target.files[0]
+  if (!file) return
+  if (file.size > 2 * 1024 * 1024) return shop.notify('Image trop volumineuse (max 2MB)')
+  const reader = new FileReader()
+  reader.onload = (event) => {
+    if (draft.value && draft.value.variants && draft.value.variants[idx]) {
+      draft.value.variants[idx].image = event.target.result
+    }
+  }
+  reader.readAsDataURL(file)
+}
 
 function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.75) {
   return new Promise((resolve) => {
@@ -1210,6 +1231,17 @@ function edit(p) {
   try {
     const cp = p ? JSON.parse(JSON.stringify(p)) : blank()
     if (!cp.images) cp.images = cp.image ? [cp.image] : []
+    
+    // Initialize presetColor for variants
+    const presetColors = ['Noir', 'Blanc', 'Bleu Ciel', 'Bleu Marine', 'Bleu', 'Rouge', 'Vert Olive', 'Vert', 'Jaune', 'Orange', 'Violet', 'Rose', 'Beige', 'Marron', 'Gris']
+    if (cp.variants && Array.isArray(cp.variants)) {
+      cp.variants.forEach(v => {
+        if (!v.color) v.presetColor = ''
+        else if (presetColors.includes(v.color)) v.presetColor = v.color
+        else v.presetColor = 'Autre'
+      })
+    }
+    
     draft.value = cp
   } catch (_) {
     draft.value = blank()
@@ -2774,39 +2806,61 @@ onMounted(async () => {
         <div class="variants">
           <div class="section-line">
             <b>Variantes & stock</b>
-            <button type="button" class="text-btn" @click="draft.variants.push({color:'',size:'',stock:0,min:2,barcode:''})">
+            <button type="button" class="text-btn" @click="draft.variants.push({presetColor:'',color:'',size:'',stock:0,min:2,barcode:'',image:''})">
               <Plus :size="14"/> Ajouter
             </button>
           </div>
-          <div v-for="(v,i) in draft.variants" :key="i" class="variant-fields">
-            <select v-model="v.color" style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; background:#fff;">
-              <option value="" disabled>-- Couleur / اللون --</option>
-              <option value="Noir">⬛ Noir (أسود)</option>
-              <option value="Blanc">⬜ Blanc (أبيض)</option>
-              <option value="Bleu Ciel">🟦 Bleu Ciel (أزرق سماوي)</option>
-              <option value="Bleu Marine">🔵 Bleu Marine (أزرق داكن)</option>
-              <option value="Beige">🟫 Beige / Sable (بيج)</option>
-              <option value="Marron">🟤 Marron (بني)</option>
-              <option value="Vert Olive">🟩 Vert Olive (أخضر زيتي)</option>
-              <option value="Gris">🩶 Gris (رمادي)</option>
-              <option value="Rouge">🟥 Rouge / Bordeaux (أحمر)</option>
-            </select>
-            <select v-model="v.size" style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; background:#fff;">
-              <option value="" disabled>-- Taille / المقاس --</option>
-              <option value="S">S</option>
-              <option value="M">M</option>
-              <option value="L">L</option>
-              <option value="XL">XL</option>
-              <option value="XXL">XXL</option>
-              <option value="3XL">3XL</option>
-              <option value="38">38 (Pantalon/Pointure)</option>
-              <option value="40">40 (Pantalon/Pointure)</option>
-              <option value="42">42 (Pantalon/Pointure)</option>
-              <option value="44">44 (Pantalon/Pointure)</option>
-              <option value="Standard">Standard / Unique (مقاس موحد)</option>
-            </select>
-            <input v-model.number="v.stock" type="number" placeholder="Stock"/>
-            <button type="button" class="icon" @click="draft.variants.splice(i,1)" :disabled="draft.variants.length===1"><X :size="15"/></button>
+          <div v-for="(v,i) in draft.variants" :key="i" style="background: #f8fafc; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 10px;">
+            <div class="variant-fields" style="display:flex; align-items:center; gap:8px;">
+              <div style="display:flex; flex-direction:column; gap:6px; flex: 1;">
+                <select v-model="v.presetColor" @change="v.color = v.presetColor === 'Autre' ? '' : v.presetColor" style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; background:#fff;">
+                  <option value="" disabled>-- Couleur / اللون --</option>
+                  <option value="Noir">⬛ Noir (أسود)</option>
+                  <option value="Blanc">⬜ Blanc (أبيض)</option>
+                  <option value="Bleu Ciel">🟦 Bleu Ciel (أزرق سماوي)</option>
+                  <option value="Bleu Marine">🔵 Bleu Marine (أزرق داكن)</option>
+                  <option value="Bleu">🔵 Bleu (أزرق)</option>
+                  <option value="Rouge">🟥 Rouge (أحمر)</option>
+                  <option value="Vert Olive">🟩 Vert Olive (أخضر زيتي)</option>
+                  <option value="Vert">🟩 Vert (أخضر)</option>
+                  <option value="Jaune">🟨 Jaune (أصفر)</option>
+                  <option value="Orange">🟧 Orange (برتقالي)</option>
+                  <option value="Violet">🟪 Violet (بنفسجي)</option>
+                  <option value="Rose">🟪 Rose (وردي)</option>
+                  <option value="Beige">🟫 Beige (بيج)</option>
+                  <option value="Marron">🟤 Marron (بني)</option>
+                  <option value="Gris">🩶 Gris (رمادي)</option>
+                  <option value="Autre">✏️ Autre (أخرى...)</option>
+                </select>
+                <input v-if="v.presetColor === 'Autre'" v-model="v.color" type="text" placeholder="Saisir la couleur..." style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; width: 100%; box-sizing: border-box;" />
+              </div>
+
+              <select v-model="v.size" style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; background:#fff; flex: 1;">
+                <option value="" disabled>-- Taille / المقاس --</option>
+                <option value="S">S</option>
+                <option value="M">M</option>
+                <option value="L">L</option>
+                <option value="XL">XL</option>
+                <option value="XXL">XXL</option>
+                <option value="3XL">3XL</option>
+                <option value="38">38 (Pantalon/Pointure)</option>
+                <option value="40">40 (Pantalon/Pointure)</option>
+                <option value="42">42 (Pantalon/Pointure)</option>
+                <option value="44">44 (Pantalon/Pointure)</option>
+                <option value="Standard">Standard / Unique (مقاس موحد)</option>
+              </select>
+              <input v-model.number="v.stock" type="number" placeholder="Stock" style="flex: 1;" />
+              <button type="button" class="icon" @click="draft.variants.splice(i,1)" :disabled="draft.variants.length===1"><X :size="15"/></button>
+            </div>
+            
+            <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+              <button type="button" class="btn secondary" @click="triggerVariantImageUpload(i)" style="padding: 4px 10px; font-size: 12px; display: flex; align-items: center;">
+                <Image :size="14" style="margin-right:4px;" /> Image de la couleur
+              </button>
+              <img v-if="v.image" :src="v.image" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1;" />
+              <button v-if="v.image" type="button" class="icon" style="color:#dc2626; margin-left: -5px;" @click="v.image = ''"><X :size="14" /></button>
+              <input :ref="el => variantImageInputs[i] = el" type="file" accept="image/*" style="display:none" @change="e => handleVariantImage(e, i)" />
+            </div>
           </div>
         </div>
         <div class="modal-actions">

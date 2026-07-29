@@ -262,6 +262,15 @@ const filteredProducts = computed(() => {
 // Single Product Page Helpers
 const selectedColor = ref('')
 
+const currentDisplayImage = computed(() => {
+  if (!activeProduct.value) return ''
+  const baseImages = getProductImagesList(activeProduct.value)
+  if (selectedVariant.value && selectedVariant.value.image && activeImageIndex.value === 0) {
+    return selectedVariant.value.image
+  }
+  return baseImages[activeImageIndex.value] || getProductImage(activeProduct.value)
+})
+
 const availableColors = computed(() => {
   if (!activeProduct.value || !Array.isArray(activeProduct.value.variants)) return []
   return activeProduct.value.variants
@@ -812,7 +821,7 @@ function getProductImagesList(product) {
         <div class="gallery-col">
           <div class="main-display-box">
             <img 
-              :src="getProductImagesList(activeProduct)[activeImageIndex] || getProductImage(activeProduct)" 
+              :src="currentDisplayImage" 
               :alt="activeProduct.name" 
             />
           </div>
@@ -896,15 +905,6 @@ function getProductImagesList(product) {
             >
               <ShoppingBag :size="16" />
               <span>{{ currentLang === 'ar' ? 'إضافة إلى السلة' : 'Ajouter au Panier' }}</span>
-            </button>
-
-            <button 
-              @click="copyProductLink"
-              class="share-link-btn"
-              :title="currentLang === 'ar' ? 'نسخ رابط هذا المنتج' : 'Copier le lien direct'"
-            >
-              <Share2 :size="15" />
-              <span>{{ linkCopied ? (currentLang === 'ar' ? 'تم نسخ الرابط! 📋' : 'Lien copié! 📋') : (currentLang === 'ar' ? 'نسخ رابط المنتج 🔗' : 'Copier le lien 🔗') }}</span>
             </button>
           </div>
 
