@@ -474,7 +474,7 @@ function removeVariantImage(vIdx, imgIdx) {
   draft.value.variants[vIdx].images.splice(imgIdx, 1)
 }
 
-function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.75) {
+function compressImage(file, maxWidth = 600, maxHeight = 600, quality = 0.6) {
   return new Promise((resolve) => {
     const reader = new FileReader()
     reader.onload = (e) => {

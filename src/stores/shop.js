@@ -657,24 +657,6 @@ export const useShop = defineStore('shop', {
         for (const job of jobs) {
           const entityId = String(job.payload?.id || job.id)
           let syncPayload = job.payload;
-          
-          if (job.table === 'products' && syncPayload) {
-            // Strip huge base64 images to prevent 500/timeout from Supabase
-            const { images, image, variants, ...strippedPayload } = syncPayload;
-            
-            // Clean variants as well
-            let cleanedVariants = variants;
-            if (Array.isArray(variants)) {
-              cleanedVariants = variants.map(v => {
-                const { images: vImages, image: vImage, ...vStripped } = v;
-                return vStripped;
-              });
-            }
-            
-            strippedPayload.variants = cleanedVariants;
-            syncPayload = strippedPayload;
-          }
-
           const { error } = await supabase
             .from('app_sync')
             .upsert(
@@ -686,8 +668,12 @@ export const useShop = defineStore('shop', {
             else this.notify(`Erreur Sync Supabase : ${error.message}`)
             console.error('Supabase sync error:', error)
             
-            // If the payload is STILL too large, we shouldn't completely block the queue.
-            // Wait, we'll let it block for now, but stripping images solves 99% of 500 errors.
+            // If the payload is too large or times out (57014), we MUST skip it so it doesn't block the entire queue.
+            if (error.code === '57014' || String(error.message).includes('500') || String(error.message).includes('timeout') || String(error.message).includes('large')) {
+              console.warn('Skipping massive payload job to unblock queue:', job.id)
+              await localDb.queue.delete(job.id)
+              continue
+            }
             return
           }
 
@@ -740,6 +726,23 @@ export const useShop = defineStore('shop', {
               await localDb.products.delete(entity_id)
               this.products = this.products.filter(x => x.id !== entity_id)
             } else if (payload.id) {
+              const localItem = await localDb.products.get(entity_id)
+              // Restore images if they were stripped from payload
+              if (localItem) {
+                if (!payload.image && localItem.image) payload.image = localItem.image
+                if ((!payload.images || !payload.images.length) && localItem.images) payload.images = localItem.images
+                
+                if (payload.variants && localItem.variants) {
+                  payload.variants.forEach((v, i) => {
+                    const localV = localItem.variants[i]
+                    if (localV) {
+                      if (!v.image && localV.image) v.image = localV.image
+                      if ((!v.images || !v.images.length) && localV.images) v.images = localV.images
+                    }
+                  })
+                }
+              }
+
               await localDb.products.put(payload)
               const idx = this.products.findIndex(x => x.id === payload.id)
               if (idx < 0) this.products.push(payload)
