@@ -78,7 +78,7 @@ let heroTimer = null
 function startHeroAutoScroll() {
   stopHeroAutoScroll()
   heroTimer = setInterval(() => {
-    currentHeroIndex.value = (currentHeroIndex.value + 1) % heroSlides.length
+    currentHeroIndex.value = (currentHeroIndex.value + 1) % heroSlides.value.length
   }, 4000)
 }
 
@@ -87,12 +87,12 @@ function stopHeroAutoScroll() {
 }
 
 function nextHeroSlide() {
-  currentHeroIndex.value = (currentHeroIndex.value + 1) % heroSlides.length
+  currentHeroIndex.value = (currentHeroIndex.value + 1) % heroSlides.value.length
   startHeroAutoScroll()
 }
 
 function prevHeroSlide() {
-  currentHeroIndex.value = (currentHeroIndex.value - 1 + heroSlides.length) % heroSlides.length
+  currentHeroIndex.value = (currentHeroIndex.value - 1 + heroSlides.value.length) % heroSlides.value.length
   startHeroAutoScroll()
 }
 
