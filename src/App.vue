@@ -478,7 +478,7 @@ function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.75) {
   return new Promise((resolve) => {
     const reader = new FileReader()
     reader.onload = (e) => {
-      const img = new Image()
+      const img = new window.Image()
       img.onload = () => {
         const canvas = document.createElement('canvas')
         let width = img.width
@@ -2810,8 +2810,10 @@ onMounted(async () => {
             🖼️ Photos du Produit (Multi-Images / صور المنتج من جهازك)
           </label>
           <div style="border:2px dashed #cbd5e1; padding:12px; border-radius:12px; text-align:center; background:#f8fafc; position:relative;">
-            <label style="display:block; margin-bottom: 8px; font-weight: bold; color: #2563eb;">Cliquez ci-dessous pour choisir des photos :</label>
-            <input type="file" multiple accept="image/*" @change="handleProductImageUpload" style="display:block; margin: 0 auto;" />
+            <label style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#2563eb; background:#ffffff; padding:8px 14px; border-radius:8px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+              📁 Sélectionner des photos depuis l'appareil
+              <input type="file" multiple accept="image/*" @change="handleProductImageUpload" style="opacity:0; position:absolute; width:1px; height:1px; z-index:-1;" />
+            </label>
             <p style="font-size:11px; color:#64748b; margin-top:6px;">Vous pouvez ajouter plusieurs photos pour les afficher dans la carte du Storefront.</p>
           </div>
 
@@ -2874,8 +2876,10 @@ onMounted(async () => {
             
             <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
               <div style="display: flex; align-items: center; gap: 10px; position:relative;">
-                <label style="font-size: 11px; font-weight: bold; color: #475569;">Images de la couleur ({{ v.images ? v.images.length : 0 }}) :</label>
-                <input type="file" multiple accept="image/*" @change="e => handleVariantImage(e, i)" />
+                <label class="btn secondary" style="cursor:pointer; padding: 4px 10px; font-size: 12px; display: flex; align-items: center;">
+                  <Image :size="14" style="margin-right:4px;" /> Images de la couleur ({{ v.images ? v.images.length : 0 }})
+                  <input type="file" multiple accept="image/*" style="opacity:0; position:absolute; width:1px; height:1px; z-index:-1;" @change="e => handleVariantImage(e, i)" />
+                </label>
               </div>
               
               <div v-if="v.images && v.images.length > 0" style="display:flex; gap:6px; flex-wrap:wrap;">
