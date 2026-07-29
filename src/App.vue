@@ -447,15 +447,13 @@ const variantImageInputs = ref([])
 const mainImageInput = ref(null)
 
 function triggerMainImageUpload() {
-  if (mainImageInput.value) {
-    mainImageInput.value.click()
-  }
+  const el = document.getElementById('main-img-input')
+  if (el) el.click()
 }
 
 function triggerVariantImageUpload(idx) {
-  if (variantImageInputs.value[idx]) {
-    variantImageInputs.value[idx].click()
-  }
+  const el = document.getElementById('variant-img-input-' + idx)
+  if (el) el.click()
 }
 
 async function handleVariantImage(e, idx) {
@@ -2805,7 +2803,7 @@ onMounted(async () => {
             🖼️ Photos du Produit (Multi-Images / صور المنتج من جهازك)
           </label>
           <div style="border:2px dashed #cbd5e1; padding:12px; border-radius:12px; text-align:center; background:#f8fafc;">
-            <input type="file" multiple accept="image/*" @change="handleProductImageUpload" ref="mainImageInput" style="display:none;" />
+            <input type="file" multiple accept="image/*" @change="handleProductImageUpload" id="main-img-input" style="display:none;" />
             <button type="button" @click="triggerMainImageUpload" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#2563eb; background:#ffffff; padding:8px 14px; border-radius:8px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
               📁 Sélectionner des photos depuis l'appareil
             </button>
@@ -2874,7 +2872,7 @@ onMounted(async () => {
                 <button type="button" class="btn secondary" @click="triggerVariantImageUpload(i)" style="padding: 4px 10px; font-size: 12px; display: flex; align-items: center;">
                   <Image :size="14" style="margin-right:4px;" /> Images de la couleur ({{ v.images ? v.images.length : 0 }})
                 </button>
-                <input :ref="el => variantImageInputs[i] = el" type="file" multiple accept="image/*" style="display:none" @change="e => handleVariantImage(e, i)" />
+                <input :id="'variant-img-input-' + i" type="file" multiple accept="image/*" style="display:none" @change="e => handleVariantImage(e, i)" />
               </div>
               
               <div v-if="v.images && v.images.length > 0" style="display:flex; gap:6px; flex-wrap:wrap;">
