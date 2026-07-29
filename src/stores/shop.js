@@ -659,8 +659,19 @@ export const useShop = defineStore('shop', {
           let syncPayload = job.payload;
           
           if (job.table === 'products' && syncPayload) {
-            // Strip huge base64 images to prevent 500 Payload Too Large from Supabase
-            const { images, image, ...strippedPayload } = syncPayload;
+            // Strip huge base64 images to prevent 500/timeout from Supabase
+            const { images, image, variants, ...strippedPayload } = syncPayload;
+            
+            // Clean variants as well
+            let cleanedVariants = variants;
+            if (Array.isArray(variants)) {
+              cleanedVariants = variants.map(v => {
+                const { images: vImages, image: vImage, ...vStripped } = v;
+                return vStripped;
+              });
+            }
+            
+            strippedPayload.variants = cleanedVariants;
             syncPayload = strippedPayload;
           }
 
