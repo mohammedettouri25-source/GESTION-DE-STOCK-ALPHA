@@ -223,6 +223,9 @@ io.on('connection', (socket) => {
     console.log('Frontend connected via WebSocket');
     
     socket.emit('status', { isConnected, qr: qrCodeData });
+    if (qrCodeData) {
+        socket.emit('qr', qrCodeData);
+    }
 
     socket.on('disconnect', () => {
         console.log('Frontend disconnected');
