@@ -174,6 +174,24 @@ app.get('/status', (req, res) => {
     res.json({ isConnected, qr: qrCodeData });
 });
 
+app.get('/reset-whatsapp', (req, res) => {
+    const authFolder = path.join(__dirname, '.wwebjs_auth');
+    try {
+        if (client) {
+            client.destroy().catch(console.error);
+        }
+        if (fs.existsSync(authFolder)) {
+            fs.rmSync(authFolder, { recursive: true, force: true });
+        }
+        setTimeout(() => {
+            initializeWhatsAppClient();
+        }, 2000);
+        res.send('✅ الجلسة تم مسحها بنجاح! السيرفر كيعاود يخدم دابا. تقدر ترجع للموقع وتسنى QR Code يطلع ليك.');
+    } catch (err) {
+        res.status(500).send('❌ وقع مشكل ملي حاولت نمسح الجلسة: ' + err.message);
+    }
+});
+
 app.post('/bot-settings', (req, res) => {
     const { enabled, prompt, apiKey } = req.body;
     botEnabled = enabled;
