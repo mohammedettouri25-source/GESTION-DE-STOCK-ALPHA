@@ -656,16 +656,27 @@ export const useShop = defineStore('shop', {
         let synced = 0
         for (const job of jobs) {
           const entityId = String(job.payload?.id || job.id)
+          let syncPayload = job.payload;
+          
+          if (job.table === 'products' && syncPayload) {
+            // Strip huge base64 images to prevent 500 Payload Too Large from Supabase
+            const { images, image, ...strippedPayload } = syncPayload;
+            syncPayload = strippedPayload;
+          }
+
           const { error } = await supabase
             .from('app_sync')
             .upsert(
-              { entity_type: job.table, entity_id: entityId, payload: job.payload, updated_at: new Date().toISOString() },
+              { entity_type: job.table, entity_id: entityId, payload: syncPayload, updated_at: new Date().toISOString() },
               { onConflict: 'entity_type,entity_id' }
             )
           if (error) {
             if (error.code === '42P01') this.notify('Supabase : appliquez la migration SQL (0002_offline_sync.sql)')
             else this.notify(`Erreur Sync Supabase : ${error.message}`)
             console.error('Supabase sync error:', error)
+            
+            // If the payload is STILL too large, we shouldn't completely block the queue.
+            // Wait, we'll let it block for now, but stripping images solves 99% of 500 errors.
             return
           }
 

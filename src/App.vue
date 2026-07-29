@@ -915,6 +915,10 @@ function sendWhatsAppTrackingMessage(sale) {
 
 async function markSaleConfirmed(sale) {
   await shop.confirmSaleStatus(sale.id, 'confirmée')
+  const updatedSale = shop.sales.find(s => s.id === sale.id)
+  if (updatedSale) {
+    await dispatchOzonParcel(updatedSale)
+  }
 }
 
 // Live Chatbot Simulator
@@ -1440,6 +1444,60 @@ const unconfirmedStorefrontOrders = computed(() => {
   )
 })
 
+async function dispatchOzonParcel(sale) {
+  if (!sale || !sale.customer) return false;
+  if (sale.shipment && sale.shipment.tracking) return false; // Already shipped
+
+  const c = sale.customer;
+  if (!c.name || !c.phone) return false;
+
+  const validId = localStorage.getItem('ozon-customer-id') || import.meta.env.VITE_OZON_CUSTOMER_ID || '';
+  const validKey = localStorage.getItem('ozon-api-key') || import.meta.env.VITE_OZON_API_KEY || '';
+  
+  if (!validId || !validKey) return false;
+
+  try {
+    let cityIdParam = String(c.cityId || '').trim();
+    const query = String(c.city || '').trim().toLowerCase();
+
+    if (query) {
+      const match = OZON_CITIES.find(city => city.name.toLowerCase() === query || city.name.toLowerCase().includes(query))
+      if (match) cityIdParam = String(match.id)
+    }
+    if (!cityIdParam || cityIdParam === '1' || cityIdParam === '0') {
+      cityIdParam = '2165' // Default Casablanca
+    }
+
+    const response = await createOzonParcel({
+      customerId: validId,
+      apiKey: validKey,
+      parcel: {
+        'parcel-receiver': c.name,
+        'parcel-phone': c.phone,
+        'parcel-city': cityIdParam,
+        'parcel-address': c.address || 'Adresse à préciser',
+        'parcel-note': c.note || 'Appeler avant livraison',
+        'parcel-price': sale.total || 0,
+        'parcel-declared-value': Math.max(50, sale.total || 0),
+        'parcel-nature': 'Commande ' + sale.number,
+        'parcel-stock': 0,
+        'parcel-open': '1',
+        'parcel-fragile': '0',
+        'parcel-replace': '0'
+      }
+    })
+
+    const tracking = response['TRACKING-NUMBER'] || response.tracking || response['NEW-PARCEL']?.['TRACKING-NUMBER'] || 'Ozon Express'
+    await shop.attachShipment(sale.id, { tracking, city: response.CITY_NAME || c.city || 'Casablanca', status: 'created', response })
+    shop.notify(`Colis Ozon généré avec succès ! Tracking : ${tracking}`)
+    return true;
+  } catch (error) {
+    console.error('Ozon auto-creation error:', error)
+    shop.notify(`Erreur de génération Ozon : ${error.message}`)
+    return false;
+  }
+}
+
 async function confirmStorefrontOrder(sale) {
   const updated = {
     ...sale,
@@ -1448,6 +1506,8 @@ async function confirmStorefrontOrder(sale) {
   }
   await shop.updateSale(updated)
   shop.notify(`Commande ${sale.number} confirmée avec succès ✓`)
+  // Automatically dispatch to Ozon
+  await dispatchOzonParcel(updated)
 }
 
 async function confirmAllStorefrontOrders() {
