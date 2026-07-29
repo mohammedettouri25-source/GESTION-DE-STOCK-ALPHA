@@ -1051,6 +1051,10 @@ const dailyProfitsReport = computed(() => {
         itemsCount: 0,
         revenue: 0,
         cogs: 0,
+        onlineRevenue: 0,
+        onlineCogs: 0,
+        offlineRevenue: 0,
+        offlineCogs: 0,
         expenses: 0,
         itemsMap: new Map()
       })
@@ -1059,6 +1063,12 @@ const dailyProfitsReport = computed(() => {
     const dayData = map.get(dateKey)
     dayData.salesCount += 1
     dayData.revenue += Number(sale.total) || 0
+    
+    if (sale.source === 'storefront' || sale.type === 'online') {
+      dayData.onlineRevenue += Number(sale.total) || 0
+    } else {
+      dayData.offlineRevenue += Number(sale.total) || 0
+    }
 
     ;(sale.items || []).forEach(item => {
       const q = Number(item.quantity) || 1
@@ -1072,6 +1082,11 @@ const dailyProfitsReport = computed(() => {
       const itemProfit = totalRev - totalCost
 
       dayData.cogs += totalCost
+      if (sale.source === 'storefront' || sale.type === 'online') {
+        dayData.onlineCogs += totalCost
+      } else {
+        dayData.offlineCogs += totalCost
+      }
 
       const itemKey = `${item.name} (${item.variant || 'Standard'})`
       if (!dayData.itemsMap.has(itemKey)) {
@@ -1108,6 +1123,10 @@ const dailyProfitsReport = computed(() => {
         itemsCount: 0,
         revenue: 0,
         cogs: 0,
+        onlineRevenue: 0,
+        onlineCogs: 0,
+        offlineRevenue: 0,
+        offlineCogs: 0,
         expenses: 0,
         itemsMap: new Map()
       })
@@ -1119,11 +1138,15 @@ const dailyProfitsReport = computed(() => {
 
   const report = Array.from(map.values()).map(d => {
     const grossProfit = d.revenue - d.cogs
+    const onlineProfit = d.onlineRevenue - d.onlineCogs
+    const offlineProfit = d.offlineRevenue - d.offlineCogs
     const netProfit = grossProfit - d.expenses
     const margin = d.revenue > 0 ? ((netProfit / d.revenue) * 100).toFixed(1) : 0
     return {
       ...d,
       grossProfit,
+      onlineProfit,
+      offlineProfit,
       netProfit,
       margin,
       itemsList: Array.from(d.itemsMap.values())
@@ -2358,6 +2381,14 @@ onMounted(async () => {
               {{ money(profitSummary.netProfit) }}
             </strong>
             <em class="badge-profit">Marge Nette : {{ profitSummary.margin }} %</em>
+            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.1); font-size: 11px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="display:flex; justify-content:space-between; color:#ea580c">
+                <span>Online (Brut)</span> <b>{{ money(profitSummary.onlineProfit) }}</b>
+              </span>
+              <span style="display:flex; justify-content:space-between; color:#3b82f6">
+                <span>Magasin (Brut)</span> <b>{{ money(profitSummary.offlineProfit) }}</b>
+              </span>
+            </div>
           </article>
         </div>
 
@@ -2398,10 +2429,12 @@ onMounted(async () => {
                 <span class="font-bold">{{ money(d.revenue) }}</span>
                 <span class="text-muted">{{ money(d.cogs) }}</span>
                 <span class="text-muted">{{ money(d.expenses) }}</span>
-                <span>
+                <span style="display:flex; flex-direction:column; gap:4px;">
                   <strong :class="d.netProfit >= 0 ? 'profit-pill-success' : 'profit-pill-danger'">
                     {{ d.netProfit >= 0 ? '+' : '' }}{{ money(d.netProfit) }}
                   </strong>
+                  <div style="font-size:10px; color:#ea580c; text-align:left; line-height: 1.1; margin-top:2px;">Online (Brut): {{ money(d.onlineProfit) }}</div>
+                  <div style="font-size:10px; color:#3b82f6; text-align:left; line-height: 1.1;">Magasin (Brut): {{ money(d.offlineProfit) }}</div>
                 </span>
                 <span><b>{{ d.margin }} %</b></span>
                 <button class="icon quiet">
