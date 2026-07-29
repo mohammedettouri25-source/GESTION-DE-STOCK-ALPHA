@@ -641,7 +641,7 @@ function getProductImagesList(product) {
     </header>
 
     <!-- PAGE 1: HOME CATALOGUE VIEW -->
-    <div v-if="currentPage === 'home'" class="store-layout-container">
+    <div v-if="currentPage === 'home'">
       
       <!-- FULL-WIDTH PURE IMAGE HERO BANNER SHOWCASE -->
       <section 
@@ -697,7 +697,8 @@ function getProductImagesList(product) {
       </section>
 
       <!-- APPLE-STYLE TOP HORIZONTAL CATEGORY & FILTER BAR -->
-      <nav class="top-filter-bar">
+      <div class="store-layout-container">
+        <nav class="top-filter-bar">
         <div class="filter-controls-row">
           
           <!-- Category Selector Dropdown -->
@@ -805,10 +806,10 @@ function getProductImagesList(product) {
         <div v-else class="empty-catalogue-box">
           <Search :size="36" class="empty-icon" />
           <h3>{{ currentLang === 'ar' ? 'لم يتم العثور على أي منتج' : 'Aucun produit trouvé' }}</h3>
-          <p>{{ currentLang === 'ar' ? 'جرب تغيير التصنيف أو فلاتر البحث.' : 'Essayez de changer la catégorie ou les filtres.' }}</p>
+          <p>{{ currentLang === 'ar' ? 'جرب تغيير التصنيف أو فلاتر البحث.' : 'Essayez de changer la catégorie أو les filtres.' }}</p>
         </div>
-
       </main>
+      </div> <!-- End of store-layout-container -->
     </div>
 
 
@@ -1455,11 +1456,8 @@ function getProductImagesList(product) {
   position: relative;
   width: 100%;
   height: 380px;
-  border-radius: 24px;
   overflow: hidden;
   margin-bottom: 24px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.08);
-  border: 1px solid #1d1d1f;
   background-color: #0f0f12;
 }
 @media (min-width: 768px) {
@@ -1497,6 +1495,8 @@ function getProductImagesList(product) {
   position: relative;
   z-index: 2;
   width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
   height: 100%;
   display: flex;
   align-items: center;
@@ -2672,12 +2672,8 @@ function getProductImagesList(product) {
 @media (max-width: 640px) {
   .store-hero-slider-full {
     border-radius: 0 !important;
-    margin-left: -16px !important;
-    margin-right: -16px !important;
-    width: calc(100% + 32px) !important;
-    border-left: none !important;
-    border-right: none !important;
-    border-top: none !important;
+    width: 100% !important;
+    border: none !important;
   }
   .nav-container {
     gap: 8px;
