@@ -444,6 +444,13 @@ const blank = () => {
 const draft = ref(blank())
 
 const variantImageInputs = ref([])
+const mainImageInput = ref(null)
+
+function triggerMainImageUpload() {
+  if (mainImageInput.value) {
+    mainImageInput.value.click()
+  }
+}
 
 function triggerVariantImageUpload(idx) {
   if (variantImageInputs.value[idx]) {
@@ -517,6 +524,8 @@ async function handleProductImageUpload(e) {
       if (!draft.value.image) draft.value.image = compressed
     } catch (_) {}
   }
+  // Reset the input so the same file can be selected again
+  if (e.target) e.target.value = ''
 }
 
 function removeProductImage(index) {
@@ -2796,10 +2805,10 @@ onMounted(async () => {
             🖼️ Photos du Produit (Multi-Images / صور المنتج من جهازك)
           </label>
           <div style="border:2px dashed #cbd5e1; padding:12px; border-radius:12px; text-align:center; background:#f8fafc;">
-            <input type="file" multiple accept="image/*" @change="handleProductImageUpload" id="prod-img-input" style="display:none;" />
-            <label for="prod-img-input" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#2563eb; background:#ffffff; padding:8px 14px; border-radius:8px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+            <input type="file" multiple accept="image/*" @change="handleProductImageUpload" ref="mainImageInput" style="display:none;" />
+            <button type="button" @click="triggerMainImageUpload" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#2563eb; background:#ffffff; padding:8px 14px; border-radius:8px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
               📁 Sélectionner des photos depuis l'appareil
-            </label>
+            </button>
             <p style="font-size:11px; color:#64748b; margin-top:6px;">Vous pouvez ajouter plusieurs photos pour les afficher dans la carte du Storefront.</p>
           </div>
 
