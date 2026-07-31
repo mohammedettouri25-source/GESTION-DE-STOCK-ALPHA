@@ -510,7 +510,7 @@ function removeVariantImage(vIdx, imgIdx) {
   }
 }
 
-function compressImage(file, maxWidth = 600, maxHeight = 600, quality = 0.6) {
+function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) {
   return new Promise((resolve) => {
     const reader = new FileReader()
     reader.onload = (e) => {
