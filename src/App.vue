@@ -510,7 +510,7 @@ function removeVariantImage(vIdx, imgIdx) {
   }
 }
 
-function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) {
+function compressImage(file, maxWidth = 1600, maxHeight = 1600, quality = 0.92) {
   return new Promise((resolve) => {
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -536,7 +536,8 @@ function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) 
         canvas.height = height
         const ctx = canvas.getContext('2d')
         ctx.drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', quality))
+        // Use WebP for better quality and transparency support
+        resolve(canvas.toDataURL('image/webp', quality))
       }
       img.onerror = () => resolve(e.target.result)
       img.src = e.target.result
