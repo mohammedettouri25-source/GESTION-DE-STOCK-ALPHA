@@ -448,6 +448,22 @@ const draft = ref(blank())
 const variantImageInputs = ref([])
 const mainImageInput = ref(null)
 
+function syncVariantImages(v) {
+  const targetColor = (v.presetColor || v.color || '').trim().toLowerCase()
+  if (!targetColor) return
+  
+  const sourceVariant = draft.value.variants.find(other => {
+     return other !== v && 
+            (other.presetColor || other.color || '').trim().toLowerCase() === targetColor && 
+            Array.isArray(other.images) && other.images.length > 0
+  })
+
+  if (sourceVariant) {
+    v.images = [...sourceVariant.images]
+    v.image = sourceVariant.image
+  }
+}
+
 async function handleVariantImage(e, idx) {
   try {
     const files = Array.from(e.target.files || [])
@@ -3077,14 +3093,14 @@ onMounted(async () => {
         <div class="variants">
           <div class="section-line">
             <b>Variantes & stock</b>
-            <button type="button" class="text-btn" @click="draft.variants.push({presetColor:'',color:'',size:'',sizes:[],stock:0,min:2,barcode:'',image:''})">
+            <button type="button" class="text-btn" @click="draft.variants.push({presetColor:'',color:'',size:'',sizes:[],stock:0,min:2,barcode:'',image:'',images:[]})">
               <Plus :size="14"/> Ajouter
             </button>
           </div>
           <div v-for="(v,i) in draft.variants" :key="i" style="background: #f8fafc; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 10px;">
             <div class="variant-fields" style="display:flex; align-items:center; gap:8px;">
               <div style="display:flex; flex-direction:column; gap:6px; flex: 1.5;">
-                <select v-model="v.presetColor" @change="v.color = v.presetColor === 'Autre' ? '' : v.presetColor" style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; background:#fff;">
+                <select v-model="v.presetColor" @change="v.color = v.presetColor === 'Autre' ? '' : v.presetColor; syncVariantImages(v)" style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; background:#fff;">
                   <option value="" disabled>-- Couleur / اللون --</option>
                   <option value="Noir">⬛ Noir (أسود)</option>
                   <option value="Blanc">⬜ Blanc (أبيض)</option>
@@ -3103,7 +3119,7 @@ onMounted(async () => {
                   <option value="Gris">🩶 Gris (رمادي)</option>
                   <option value="Autre">✏️ Autre (أخرى...)</option>
                 </select>
-                <input v-if="v.presetColor === 'Autre'" v-model="v.color" type="text" placeholder="Saisir la couleur..." style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; width: 100%; box-sizing: border-box;" />
+                <input v-if="v.presetColor === 'Autre'" v-model="v.color" @change="syncVariantImages(v)" type="text" placeholder="Saisir la couleur..." style="padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; width: 100%; box-sizing: border-box;" />
               </div>
 
               <!-- Multi-Size Selector UI -->
