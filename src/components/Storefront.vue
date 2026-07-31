@@ -335,6 +335,24 @@ function copyProductLink() {
   }
 }
 
+let autoScrollTimer = null
+
+function startAutoScroll() {
+  stopAutoScroll()
+  autoScrollTimer = setInterval(() => {
+    if (activeProductImages.value && activeProductImages.value.length > 1) {
+      activeImageIndex.value = (activeImageIndex.value + 1) % activeProductImages.value.length
+    }
+  }, 3000) // Scroll every 3 seconds
+}
+
+function stopAutoScroll() {
+  if (autoScrollTimer) {
+    clearInterval(autoScrollTimer)
+    autoScrollTimer = null
+  }
+}
+
 function openProductDetail(product, pushHistory = true) {
   if (!product) return
   activeProduct.value = product
@@ -351,6 +369,7 @@ function openProductDetail(product, pushHistory = true) {
   if (typeof window !== 'undefined') {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+  startAutoScroll()
 }
 
 function onColorSelect(color) {
@@ -361,11 +380,13 @@ function onColorSelect(color) {
     if (matched) {
       selectedVariant.value = matched
       activeImageIndex.value = 0
+      startAutoScroll()
     }
   }
 }
 
 function backToHome(pushHistory = true) {
+  stopAutoScroll()
   currentPage.value = 'home'
   activeProduct.value = null
   selectedProductId.value = null
@@ -841,7 +862,7 @@ function getProductImagesList(product) {
               v-for="(img, idx) in activeProductImages" 
               :key="idx"
               :src="img"
-              @click="activeImageIndex = idx"
+              @click="activeImageIndex = idx; startAutoScroll()"
               :class="['thumb-img', activeImageIndex === idx ? 'active' : '']"
             />
           </div>
@@ -886,7 +907,7 @@ function getProductImagesList(product) {
               <button 
                 v-for="v in filteredVariantsByColor" 
                 :key="v.id"
-                @click="selectedVariant = v; activeImageIndex = 0"
+                @click="selectedVariant = v; activeImageIndex = 0; startAutoScroll()"
                 :disabled="v.stock <= 0"
                 :class="[
                   'size-btn',
