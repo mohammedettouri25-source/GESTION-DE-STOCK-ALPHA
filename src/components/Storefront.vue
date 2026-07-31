@@ -540,6 +540,15 @@ function getWhatsAppOrderLink(order) {
 function getProductImage(product) {
   if (Array.isArray(product.images) && product.images.length > 0 && product.images[0]) return product.images[0]
   if (product.image) return product.image
+  
+  if (Array.isArray(product.variants) && product.variants.length > 0) {
+    const v = product.variants.find(v => v.image || (Array.isArray(v.images) && v.images.length > 0))
+    if (v) {
+      if (Array.isArray(v.images) && v.images.length > 0) return v.images[0]
+      if (v.image) return v.image
+    }
+  }
+
   const cat = (product.category || '').toLowerCase()
   if (cat.includes('chemise')) return 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=1000&q=80'
   if (cat.includes('ensemble')) return 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1000&q=80'

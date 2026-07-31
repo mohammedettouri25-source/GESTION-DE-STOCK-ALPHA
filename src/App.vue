@@ -453,14 +453,26 @@ async function handleVariantImage(e, idx) {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
     const v = draft.value.variants[idx]
-    if (!v.images) v.images = []
-
+    const targetColor = (v.presetColor || v.color || '').trim().toLowerCase()
+    
     for (const file of files) {
       try {
         const compressed = await compressImage(file)
         if (compressed) {
-          v.images.push(compressed)
-          if (!v.image) v.image = compressed
+          if (targetColor) {
+            draft.value.variants.forEach(variant => {
+              const vColor = (variant.presetColor || variant.color || '').trim().toLowerCase()
+              if (vColor === targetColor) {
+                if (!variant.images) variant.images = []
+                variant.images.push(compressed)
+                if (!variant.image) variant.image = compressed
+              }
+            })
+          } else {
+            if (!v.images) v.images = []
+            v.images.push(compressed)
+            if (!v.image) v.image = compressed
+          }
         }
       } catch (err) {
         alert("Variant Compression Error: " + err.message)
@@ -473,7 +485,29 @@ async function handleVariantImage(e, idx) {
 }
 
 function removeVariantImage(vIdx, imgIdx) {
-  draft.value.variants[vIdx].images.splice(imgIdx, 1)
+  const v = draft.value.variants[vIdx]
+  const targetColor = (v.presetColor || v.color || '').trim().toLowerCase()
+  const imgToRemove = v.images[imgIdx]
+
+  if (targetColor && imgToRemove) {
+    draft.value.variants.forEach(variant => {
+      const vColor = (variant.presetColor || variant.color || '').trim().toLowerCase()
+      if (vColor === targetColor && variant.images) {
+        const idx = variant.images.indexOf(imgToRemove)
+        if (idx !== -1) {
+          variant.images.splice(idx, 1)
+          if (variant.image === imgToRemove) {
+            variant.image = variant.images[0] || ''
+          }
+        }
+      }
+    })
+  } else {
+    v.images.splice(imgIdx, 1)
+    if (v.image === imgToRemove) {
+      v.image = v.images[0] || ''
+    }
+  }
 }
 
 function compressImage(file, maxWidth = 600, maxHeight = 600, quality = 0.6) {
@@ -732,6 +766,9 @@ function initWhatsAppSocket() {
   
   waSocket.on('status', (data) => {
     isWaPaired.value = data.isConnected
+    if (data.isConnected) {
+      pushSettingsToBackend()
+    }
     if (data.qr) {
       QRCode.toDataURL(data.qr, (err, url) => {
         if (!err) waQrCodeUrl.value = url
