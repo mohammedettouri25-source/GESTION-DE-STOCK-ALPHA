@@ -782,8 +782,14 @@ function disconnectWa() {
   // Tell backend to logout if necessary, although usually you logout from phone.
 }
 
+function getWaBackendUrl(path = '') {
+  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
+  const base = isHttps ? 'https://localhost:3001' : 'http://localhost:3001'
+  return path ? `${base}${path}` : base
+}
+
 function initWhatsAppSocket() {
-  waSocket = io('http://localhost:3001')
+  waSocket = io(getWaBackendUrl())
   
   waSocket.on('status', (data) => {
     isWaPaired.value = data.isConnected
@@ -857,7 +863,7 @@ function initWhatsAppSocket() {
 }
 
 function pushSettingsToBackend() {
-  fetch('http://localhost:3001/bot-settings', {
+  fetch(getWaBackendUrl('/bot-settings'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -983,7 +989,7 @@ async function sendInboxMessage(customText = null) {
 
   if (isWaPaired.value) {
     // Send via real WhatsApp backend
-    fetch('http://localhost:3001/send-message', {
+    fetch(getWaBackendUrl('/send-message'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
