@@ -392,6 +392,14 @@ function stopAutoScroll() {
   }
 }
 
+function trackMetaEvent(eventName, params = {}) {
+  if (typeof window !== 'undefined' && window.fbq) {
+    try {
+      window.fbq('track', eventName, params)
+    } catch (_) {}
+  }
+}
+
 function openProductDetail(product, pushHistory = true) {
   if (!product) return
   activeProduct.value = product
@@ -400,6 +408,13 @@ function openProductDetail(product, pushHistory = true) {
   selectedColor.value = selectedVariant.value?.color || (product.variants?.[0]?.color || '')
   activeImageIndex.value = 0
   currentPage.value = 'product'
+  trackMetaEvent('ViewContent', {
+    content_name: product.name,
+    content_category: product.category || 'Vêtement',
+    content_ids: [product.id],
+    value: Number(product.price) || 0,
+    currency: 'MAD'
+  })
   if (pushHistory && typeof window !== 'undefined') {
     const url = new URL(window.location.href)
     url.searchParams.set('product', product.id)
@@ -534,6 +549,12 @@ function addToCart(product, variant = null, buyNow = false) {
   } else if (addedIndex > -1) {
     openUndoToast(product, targetVariant, addedIndex)
   }
+  trackMetaEvent('AddToCart', {
+    content_name: product.name,
+    content_ids: [product.id],
+    value: Number(product.price) || 0,
+    currency: 'MAD'
+  })
 }
 
 // Complete Order
@@ -568,6 +589,12 @@ async function submitOrder() {
     const cartSnapshot = JSON.parse(JSON.stringify(shop.cart))
     const totalAmount = cartTotal.value
     await shop.checkout('Paiement à la livraison (COD)', details)
+
+    trackMetaEvent('Purchase', {
+      value: Number(totalAmount) || 0,
+      currency: 'MAD',
+      num_items: cartSnapshot.length
+    })
 
     orderSuccess.value = {
       trackingId,
