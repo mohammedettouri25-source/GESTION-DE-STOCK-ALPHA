@@ -2251,62 +2251,66 @@ onMounted(async () => {
           </span>
         </div>
 
-        <div class="panel orders-list">
-          <div v-if="filteredSalesList.length" class="table">
+        <div class="panel orders-list" style="background:transparent; border:none; padding:0; box-shadow:none;">
+          <div v-if="filteredSalesList.length">
             <div 
-              class="order-row" 
+              class="order-card-row" 
               v-for="sale in filteredSalesList" 
               :key="sale.id"
-              :style="(sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed && (sale.customer?.name || sale.customer?.phone) && (Number(sale.total) > 0 || (sale.items && sale.items.length > 0)) ? 'background-color: #fff7ed; border-left: 4px solid #ea580c;' : ''"
+              :class="{ 'storefront-unconfirmed': (sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed && (sale.customer?.name || sale.customer?.phone) && (Number(sale.total) > 0 || (sale.items && sale.items.length > 0)) }"
             >
-              <span>
-                <b style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                  <span>{{sale.number || '—'}}</span>
-                  <span v-if="sale.trackingId && sale.trackingId !== sale.number" style="font-size:11px; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:6px; font-weight:700;">
+              <!-- Card Header: Order Number, Tracking Badges, Date, Total Price -->
+              <div class="order-card-header">
+                <div class="order-card-ref">
+                  <b class="order-num">{{sale.number || '—'}}</b>
+                  <span v-if="sale.trackingId && sale.trackingId !== sale.number" class="order-track-tag">
                     {{sale.trackingId}}
                   </span>
-                  <span v-if="(sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed && (sale.customer?.name || sale.customer?.phone) && (Number(sale.total) > 0 || (sale.items && sale.items.length > 0))" style="font-size:10px; font-weight:900; background:#ea580c; color:#ffffff; padding:2px 8px; border-radius:10px; letter-spacing:0.5px;">
+                  <span v-if="(sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed && (sale.customer?.name || sale.customer?.phone) && (Number(sale.total) > 0 || (sale.items && sale.items.length > 0))" class="badge-storefront-unconfirmed">
                     ⚡ STOREFRONT (طلب من المتجر)
                   </span>
-                  <span v-else-if="sale.source === 'storefront'" style="font-size:10px; font-weight:800; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:10px;">
+                  <span v-else-if="sale.source === 'storefront'" class="badge-storefront">
                     🛒 Matjer
                   </span>
-                </b>
-                <small>{{sale.createdAt ? new Date(sale.createdAt).toLocaleString('fr-MA') : '—'}}</small>
-              </span>
-              <span>
-                <b style="font-size:13px; color:#0f172a;">{{sale.customer?.name||'Vente comptoir'}}</b>
-                <small v-if="sale.customer?.phone" style="display:block; color:#475569; margin-top:2px;">📞 {{sale.customer.phone}} {{sale.customer?.city ? '· ' + sale.customer.city : ''}}</small>
-                <small v-if="sale.customer?.address" style="display:block; color:#64748b; font-size:11px;">📍 {{sale.customer.address}}</small>
+                  <small class="order-date">{{sale.createdAt ? new Date(sale.createdAt).toLocaleString('fr-MA') : '—'}}</small>
+                </div>
+                <div class="order-card-price">
+                  <strong>{{money(sale.total)}}</strong>
+                </div>
+              </div>
 
-                <!-- Detailed Items List with Color & Size badges -->
-                <div v-if="sale.items && sale.items.length" style="margin-top:6px; display:flex; flex-direction:column; gap:4px; max-width:340px;">
-                  <div 
-                    v-for="(item, idx) in sale.items" 
-                    :key="idx" 
-                    style="font-size:11px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:4px 8px; display:flex; align-items:center; justify-content:space-between; gap:6px;"
-                  >
-                    <span style="font-weight:700; color:#1e293b; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+              <!-- Card Body: Customer Info & Product Items Grid -->
+              <div class="order-card-body">
+                <!-- Customer Info Column -->
+                <div class="order-card-customer">
+                  <b class="cust-name">{{sale.customer?.name||'Vente comptoir'}}</b>
+                  <small v-if="sale.customer?.phone" class="cust-phone">📞 {{sale.customer.phone}} {{sale.customer?.city ? '· ' + sale.customer.city : ''}}</small>
+                  <small v-if="sale.customer?.address" class="cust-address">📍 {{sale.customer.address}}</small>
+                  <small v-if="sale.shipment?.tracking" class="cust-ozon">Ozon : {{sale.shipment.tracking}}</small>
+                </div>
+
+                <!-- Product Items List Column -->
+                <div class="order-card-items" v-if="sale.items && sale.items.length">
+                  <div v-for="(item, idx) in sale.items" :key="idx" class="order-item-chip">
+                    <span class="item-title">
                       <span>📦 {{ item.name }}</span>
-                      <span v-if="item.color || item.size || item.variant" style="font-size:10px; color:#0369a1; font-weight:800; background:#e0f2fe; border:1px solid #bae6fd; padding:1px 6px; border-radius:4px;">
+                      <span v-if="item.color || item.size || item.variant" class="item-variant-badge">
                         {{ [item.color ? `🎨 ${item.color}` : '', item.size ? `📏 ${item.size}` : ''].filter(Boolean).join(' | ') || item.variant }}
                       </span>
                     </span>
-                    <span style="font-weight:800; color:#0f172a; white-space:nowrap;">
+                    <span class="item-qty-price">
                       x{{ item.quantity || 1 }} — {{ (item.price || 0) * (item.quantity || 1) }} DH
                     </span>
                   </div>
                 </div>
+              </div>
 
-                <small v-if="sale.shipment?.tracking" style="display:block; margin-top:4px; color:#2563eb; font-weight:700;">Ozon : {{sale.shipment.tracking}}</small>
-              </span>
-              <strong>{{money(sale.total)}}</strong>
-              <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+              <!-- Card Actions Footer: Action Buttons -->
+              <div class="order-card-actions">
                 <!-- UNCONFIRMED STOREFRONT ORDER CONFIRMATION BUTTON -->
                 <button
                   v-if="(sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed"
-                  class="primary"
-                  style="background:#ea580c; border:none; padding:6px 12px; font-size:12px; font-weight:800; display:flex; gap:4px; align-items:center; box-shadow: 0 2px 8px rgba(234,88,12,0.3);"
+                  class="primary order-btn-confirm"
                   title="Confirmer la commande reçue du Matjer"
                   @click="confirmStorefrontOrder(sale)"
                 >
@@ -2314,7 +2318,7 @@ onMounted(async () => {
                 </button>
 
                 <!-- ALREADY CONFIRMED BADGE -->
-                <span v-else-if="sale.status==='confirmée' || sale.confirmed" class="badge-profit" style="background:#10b981; font-size:11px; padding:4px 8px; font-weight:800;">
+                <span v-else-if="sale.status==='confirmée' || sale.confirmed" class="badge-profit" style="background:#10b981; font-size:11px; padding:6px 12px; font-weight:800;">
                   🟢 {{ shop.language === 'ar' ? 'مؤكدة' : 'Confirmée' }}
                 </span>
 
@@ -2327,6 +2331,7 @@ onMounted(async () => {
                 >
                   <CheckCircle2 :size="14"/> {{ shop.language === 'ar' ? 'تأكيد الطلب' : 'Confirmer' }}
                 </button>
+
                 <button v-if="sale.customer?.phone" class="quiet" style="color:#16a34a; display:flex; gap:4px; align-items:center;" title="Envoyer le récapitulatif sur WhatsApp" @click="sendWhatsAppOrderMessage(sale)">
                   <MessageCircle :size="14"/> WhatsApp
                 </button>
