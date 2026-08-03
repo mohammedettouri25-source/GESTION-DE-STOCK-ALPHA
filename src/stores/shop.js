@@ -219,18 +219,21 @@ export const useShop = defineStore('shop', {
       this.suppliers = await localDb.suppliers?.toArray().catch(() => []) || []
       this.expenses = await localDb.expenses?.toArray().catch(() => []) || []
 
-      // Pull from Supabase BEFORE seeding — so cross-browser data takes priority
+      // Pull from Supabase BEFORE checking initial seed — so cross-browser data takes priority
       if (navigator.onLine) {
         await this.pullFromSupabase()
       }
 
-      // Only seed if still empty after pull
+      // Only seed ONCE on brand-new fresh database install, never again if user deletes their stock
       if (!this.products.length) {
-        await localDb.products.bulkAdd(seed)
-        this.products = [...seed]
-        for (const p of seed) {
-          await this.queue('products', p)
+        const hasSeededBefore = localStorage.getItem('alpha_has_seeded') === 'true'
+        if (!hasSeededBefore) {
+          await localDb.products.bulkAdd(seed)
+          this.products = [...seed]
+          localStorage.setItem('alpha_has_seeded', 'true')
         }
+      } else {
+        localStorage.setItem('alpha_has_seeded', 'true')
       }
 
       if (navigator.onLine) {
@@ -657,7 +660,26 @@ export const useShop = defineStore('shop', {
         let synced = 0
         for (const job of jobs) {
           const entityId = String(job.payload?.id || job.id)
-          let syncPayload = job.payload;
+          let syncPayload = cloneDeep(job.payload);
+          
+          // CRITICAL FIX: Strip base64 images from payload to prevent massive database sync payloads freezing the site
+          if (syncPayload && typeof syncPayload === 'object') {
+            if (job.table === 'products') {
+              if (syncPayload.image && syncPayload.image.startsWith('data:image')) syncPayload.image = ''
+              if (syncPayload.images && Array.isArray(syncPayload.images)) {
+                syncPayload.images = syncPayload.images.filter(img => !img.startsWith('data:image'))
+              }
+              if (syncPayload.variants && Array.isArray(syncPayload.variants)) {
+                syncPayload.variants.forEach(v => {
+                  if (v.image && v.image.startsWith('data:image')) v.image = ''
+                  if (v.images && Array.isArray(v.images)) {
+                    v.images = v.images.filter(img => !img.startsWith('data:image'))
+                  }
+                })
+              }
+            }
+          }
+          
           const { error } = await supabase
             .from('app_sync')
             .upsert(

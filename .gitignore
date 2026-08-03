@@ -6,4 +6,5 @@ node_modules/
 .env*
 
 whatsapp-backend/.wwebjs_auth/
+whatsapp-backend/.wwebjs_cache/
 whatsapp-backend/node_modules/
