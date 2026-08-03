@@ -99,7 +99,7 @@ export const useShop = defineStore('shop', {
       const rawSales = await localDb.sales.toArray()
       const validSales = []
       for (const s of rawSales) {
-        if (!s || !s.id || s.deleted || !s.createdAt) {
+        if (!s || !s.id || s.deleted || !s.createdAt || ((!s.number || s.number === '') && Number(s.total || 0) === 0 && !s.customer?.name && !s.customer?.phone)) {
           await localDb.sales.delete(s.id).catch(() => {})
         } else {
           validSales.push(s)
@@ -715,6 +715,9 @@ export const useShop = defineStore('shop', {
         const { data: dbSales } = await supabase.from('sales').select('*')
         if (dbSales && dbSales.length > 0) {
           for (const dbS of dbSales) {
+            // Ignore empty dummy 0 MAD sales with no number
+            if ((!dbS.number || dbS.number === '') && Number(dbS.total || 0) === 0) continue
+
             const existingIdx = salesToPut.findIndex(s => s.id === dbS.id)
             if (existingIdx >= 0) {
               if (!salesToPut[existingIdx].number && dbS.number) salesToPut[existingIdx].number = dbS.number
@@ -723,9 +726,10 @@ export const useShop = defineStore('shop', {
                 id: dbS.id,
                 number: dbS.number || '',
                 total: Number(dbS.total) || 0,
-                payment: dbS.payment_method || 'Paiement à la livraison (COD)',
-                status: dbS.status || 'unconfirmed',
-                source: 'storefront',
+                payment: dbS.payment_method || 'Espèces',
+                status: dbS.status || 'completed',
+                source: dbS.source || 'pos',
+                confirmed: true,
                 items: [],
                 createdAt: dbS.created_at || new Date().toISOString()
               })

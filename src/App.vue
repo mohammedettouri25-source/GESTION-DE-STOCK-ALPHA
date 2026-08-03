@@ -1647,9 +1647,12 @@ function saveSettings() {
 }
 const unconfirmedStorefrontOrders = computed(() => {
   return (shop.sales || []).filter(s => 
+    s &&
     (s.source === 'storefront' || s.status === 'unconfirmed' || s.status === 'pending_confirmation') && 
     s.status !== 'confirmée' && 
-    !s.confirmed
+    !s.confirmed &&
+    (s.customer?.name || s.customer?.phone) &&
+    ((s.items && s.items.length > 0) || Number(s.total || 0) > 0)
   )
 })
 
@@ -2254,7 +2257,7 @@ onMounted(async () => {
               class="order-row" 
               v-for="sale in filteredSalesList" 
               :key="sale.id"
-              :style="(sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed ? 'background-color: #fff7ed; border-left: 4px solid #ea580c;' : ''"
+              :style="(sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed && (sale.customer?.name || sale.customer?.phone) && (Number(sale.total) > 0 || (sale.items && sale.items.length > 0)) ? 'background-color: #fff7ed; border-left: 4px solid #ea580c;' : ''"
             >
               <span>
                 <b style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -2262,7 +2265,7 @@ onMounted(async () => {
                   <span v-if="sale.trackingId && sale.trackingId !== sale.number" style="font-size:11px; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:6px; font-weight:700;">
                     {{sale.trackingId}}
                   </span>
-                  <span v-if="(sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed" style="font-size:10px; font-weight:900; background:#ea580c; color:#ffffff; padding:2px 8px; border-radius:10px; letter-spacing:0.5px;">
+                  <span v-if="(sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed && (sale.customer?.name || sale.customer?.phone) && (Number(sale.total) > 0 || (sale.items && sale.items.length > 0))" style="font-size:10px; font-weight:900; background:#ea580c; color:#ffffff; padding:2px 8px; border-radius:10px; letter-spacing:0.5px;">
                     ⚡ STOREFRONT (طلب من المتجر)
                   </span>
                   <span v-else-if="sale.source === 'storefront'" style="font-size:10px; font-weight:800; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:10px;">
