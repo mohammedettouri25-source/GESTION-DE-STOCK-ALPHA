@@ -726,6 +726,7 @@ export const useShop = defineStore('shop', {
                 payment: dbS.payment_method || 'Paiement à la livraison (COD)',
                 status: dbS.status || 'unconfirmed',
                 source: 'storefront',
+                items: [],
                 createdAt: dbS.created_at || new Date().toISOString()
               })
             }

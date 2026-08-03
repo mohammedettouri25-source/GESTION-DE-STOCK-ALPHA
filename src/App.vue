@@ -2079,7 +2079,7 @@ onMounted(async () => {
             <div v-if="shop.sales.length" class="table">
               <div v-for="s in shop.sales.slice(0,5)" :key="s.id">
                 <span><b>{{s.number}}</b><small>{{new Date(s.createdAt).toLocaleString('fr-MA')}}</small></span>
-                <span>{{s.items.length}} article(s)</span>
+                <span>{{(s.items || []).length}} article(s)</span>
                 <strong>{{money(s.total)}}</strong>
                 <em>Payée</em>
               </div>
@@ -3581,7 +3581,7 @@ onMounted(async () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in activeInvoice.items" :key="item.variantId || item.productId">
+              <tr v-for="item in (activeInvoice?.items || [])" :key="item.variantId || item.productId">
                 <td><b>{{item.name}}</b> <small v-if="item.variant">({{item.variant}})</small></td>
                 <td style="text-align:center;">{{item.quantity}}</td>
                 <td style="text-align:right;">{{money(item.price)}}</td>
