@@ -308,8 +308,7 @@ export const useShop = defineStore('shop', {
         const discount = Math.max(0, Number(details.discount) || 0)
         const shipping = Math.max(0, Number(details.shipping) || 0)
 
-        // Bug fix: unique sale number using timestamp to avoid collisions across browsers
-        const saleNum = `V-${Date.now().toString(36).toUpperCase()}-${String(this.sales.length + 1).padStart(4, '0')}`
+        const saleNum = details.number || details.trackingId || `V-${Date.now().toString(36).toUpperCase()}-${String(this.sales.length + 1).padStart(4, '0')}`
 
         const saleTotal = Math.max(0, this.cartTotal - discount + shipping)
         const paidAmount = Number(details.paidAmount) || saleTotal
@@ -318,6 +317,7 @@ export const useShop = defineStore('shop', {
         const rawSale = {
           id: crypto.randomUUID(),
           number: saleNum,
+          trackingId: details.trackingId || details.number || saleNum,
           createdAt: new Date().toISOString(),
           items: this.cart.map(({ productId, variantId, sku, name, variant, price, quantity }) => ({
             productId, variantId, sku, name, variant: variant ? cloneDeep(variant) : null, price, quantity
@@ -689,6 +689,27 @@ export const useShop = defineStore('shop', {
                 image: dbImg,
                 images: dbImgs,
                 variants: dbVars
+              })
+            }
+          }
+        }
+
+        // Always query normalized sales table as well to merge missing sales records
+        const { data: dbSales } = await supabase.from('sales').select('*')
+        if (dbSales && dbSales.length > 0) {
+          for (const dbS of dbSales) {
+            const existingIdx = salesToPut.findIndex(s => s.id === dbS.id)
+            if (existingIdx >= 0) {
+              if (!salesToPut[existingIdx].number && dbS.number) salesToPut[existingIdx].number = dbS.number
+            } else {
+              salesToPut.push({
+                id: dbS.id,
+                number: dbS.number || '',
+                total: Number(dbS.total) || 0,
+                payment: dbS.payment_method || 'Paiement à la livraison (COD)',
+                status: dbS.status || 'unconfirmed',
+                source: 'storefront',
+                createdAt: dbS.created_at || new Date().toISOString()
               })
             }
           }

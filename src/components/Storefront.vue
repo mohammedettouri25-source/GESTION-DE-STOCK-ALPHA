@@ -571,6 +571,8 @@ async function submitOrder() {
     const trackingId = `ALP-${Date.now().toString(36).toUpperCase()}`
     
     const details = {
+      number: trackingId,
+      trackingId: trackingId,
       customer: {
         name: orderForm.value.name.trim(),
         phone: orderForm.value.phone.trim(),

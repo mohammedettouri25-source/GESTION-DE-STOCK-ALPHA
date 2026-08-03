@@ -90,6 +90,23 @@ const invoiceModal = ref(false)
 const activeInvoice = ref(null)
 const editSaleModal = ref(null)
 const deleteSaleModal = ref(null)
+const ordersSearchQuery = ref('')
+
+const filteredSalesList = computed(() => {
+  const q = (ordersSearchQuery.value || '').trim().toLowerCase()
+  if (!q) return shop.sales || []
+  return (shop.sales || []).filter(s => {
+    if (!s) return false
+    const num = (s.number || '').toLowerCase()
+    const track = (s.trackingId || '').toLowerCase()
+    const name = (s.customer?.name || '').toLowerCase()
+    const phone = (s.customer?.phone || '').toLowerCase()
+    const city = (s.customer?.city || '').toLowerCase()
+    const address = (s.customer?.address || '').toLowerCase()
+    const id = (s.id || '').toLowerCase()
+    return num.includes(q) || track.includes(q) || name.includes(q) || phone.includes(q) || city.includes(q) || address.includes(q) || id.includes(q)
+  })
+})
 
 function openEditSale(sale) {
   editSaleModal.value = JSON.parse(JSON.stringify(sale))
@@ -2213,17 +2230,38 @@ onMounted(async () => {
           </button>
         </div>
 
+        <!-- Orders Search Toolbar -->
+        <div class="toolbar" style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center;">
+          <div class="search" style="flex: 1;">
+            <Search :size="16" />
+            <input 
+              v-model="ordersSearchQuery" 
+              type="text" 
+              :placeholder="shop.language === 'ar' ? 'بحث برقم الطلب (ALP-... / V-...)، اسم الزبون، الهاتف، أو المدينة...' : 'Rechercher par N° Commande (ALP-... / V-...), Nom, Téléphone, Ville...'"
+            />
+            <button v-if="ordersSearchQuery" @click="ordersSearchQuery=''" style="background:none; border:none; cursor:pointer; padding:4px; color:#64748b;">
+              <X :size="14"/>
+            </button>
+          </div>
+          <span style="font-size: 12px; color: #64748b; font-weight: 600; white-space: nowrap;">
+            {{ filteredSalesList.length }} {{ shop.language === 'ar' ? 'طلبية' : 'commande(s)' }}
+          </span>
+        </div>
+
         <div class="panel orders-list">
-          <div v-if="shop.sales.length" class="table">
+          <div v-if="filteredSalesList.length" class="table">
             <div 
               class="order-row" 
-              v-for="sale in shop.sales" 
+              v-for="sale in filteredSalesList" 
               :key="sale.id"
               :style="(sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed ? 'background-color: #fff7ed; border-left: 4px solid #ea580c;' : ''"
             >
               <span>
-                <b style="display:flex; align-items:center; gap:6px;">
-                  {{sale.number || '—'}}
+                <b style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                  <span>{{sale.number || '—'}}</span>
+                  <span v-if="sale.trackingId && sale.trackingId !== sale.number" style="font-size:11px; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:6px; font-weight:700;">
+                    {{sale.trackingId}}
+                  </span>
                   <span v-if="(sale.source === 'storefront' || sale.status === 'unconfirmed' || sale.status === 'pending_confirmation') && !sale.confirmed" style="font-size:10px; font-weight:900; background:#ea580c; color:#ffffff; padding:2px 8px; border-radius:10px; letter-spacing:0.5px;">
                     ⚡ STOREFRONT (طلب من المتجر)
                   </span>
@@ -2284,7 +2322,9 @@ onMounted(async () => {
               </div>
             </div>
           </div>
-          <div v-else class="empty">Aucune commande. Créez votre première vente depuis le point de vente.</div>
+          <div v-else class="empty">
+            {{ ordersSearchQuery ? (shop.language === 'ar' ? 'لم يتم العثور على أي طلبية تطابق البحث.' : 'Aucune commande ne correspond à votre recherche.') : (shop.language === 'ar' ? 'لا توجد طلبات حالياً.' : 'Aucune commande. Créez votre première vente depuis le point de vente.') }}
+          </div>
         </div>
       </section>
 
