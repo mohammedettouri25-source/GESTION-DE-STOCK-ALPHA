@@ -191,7 +191,7 @@ export const useShop = defineStore('shop', {
         else this.products.splice(i, 1, plainP)
         await this.queue('products', plainP)
 
-        // Non-blocking Supabase sync with images & category
+        // Non-blocking Supabase sync with images, category & variants
         if (supabase && navigator.onLine) {
           try {
             supabase.from('products').upsert({
@@ -204,6 +204,7 @@ export const useShop = defineStore('shop', {
               purchase_price: plainP.purchasePrice,
               image: plainP.image || '',
               images: plainP.images || [],
+              variants: plainP.variants || [],
               description: plainP.category || ''
             }, { onConflict: 'id' }).then(() => {}).catch(() => {})
           } catch (_) {}
@@ -578,6 +579,7 @@ export const useShop = defineStore('shop', {
                 purchase_price: Number(job.payload.purchasePrice) || 0,
                 image: job.payload.image || '',
                 images: job.payload.images || [],
+                variants: job.payload.variants || [],
                 description: job.payload.category || ''
               }, { onConflict: 'id' }).then(() => {}).catch(() => {})
             }
@@ -603,7 +605,7 @@ export const useShop = defineStore('shop', {
     async pullFromSupabase() {
       if (!supabase) return
       try {
-        const { data, error } = await supabase.from('app_sync').select('*')
+        const { data } = await supabase.from('app_sync').select('*')
         
         const productsToPut = []
         const salesToPut = []
@@ -626,7 +628,6 @@ export const useShop = defineStore('shop', {
               if (payload.deleted) {
                 deletedProductIds.push(entity_id)
               } else if (payload.id) {
-                // Ensure primary image & images array are defined
                 if (!payload.images) payload.images = payload.image ? [payload.image] : []
                 if (!payload.image && payload.images.length) payload.image = payload.images[0]
                 productsToPut.push(payload)
@@ -659,22 +660,35 @@ export const useShop = defineStore('shop', {
           }
         }
 
-        // Fallback: If app_sync didn't provide products, pull from normalized products table
-        if (productsToPut.length === 0) {
-          const { data: dbProducts } = await supabase.from('products').select('*')
-          if (dbProducts && dbProducts.length > 0) {
-            for (const p of dbProducts) {
+        // Always query normalized products table to merge missing/new images & variants across devices
+        const { data: dbProducts } = await supabase.from('products').select('*')
+        if (dbProducts && dbProducts.length > 0) {
+          for (const dbP of dbProducts) {
+            const existingIdx = productsToPut.findIndex(p => p.id === dbP.id)
+            const dbImg = dbP.image || (Array.isArray(dbP.images) && dbP.images[0] ? dbP.images[0] : '')
+            const dbImgs = Array.isArray(dbP.images) && dbP.images.length > 0 ? dbP.images : (dbImg ? [dbImg] : [])
+            const dbVars = Array.isArray(dbP.variants) ? dbP.variants : []
+
+            if (existingIdx >= 0) {
+              if (!productsToPut[existingIdx].image && dbImg) productsToPut[existingIdx].image = dbImg
+              if ((!productsToPut[existingIdx].images || !productsToPut[existingIdx].images.length) && dbImgs.length) {
+                productsToPut[existingIdx].images = dbImgs
+              }
+              if (dbVars.length && (!productsToPut[existingIdx].variants || !productsToPut[existingIdx].variants.length)) {
+                productsToPut[existingIdx].variants = dbVars
+              }
+            } else {
               productsToPut.push({
-                id: p.id,
-                name: p.name,
-                sku: p.sku,
-                barcode: p.barcode,
-                category: p.category || 'Chemises',
-                price: Number(p.price) || 0,
-                purchasePrice: Number(p.purchase_price) || 0,
-                image: p.image || (Array.isArray(p.images) ? p.images[0] : ''),
-                images: Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []),
-                variants: Array.isArray(p.variants) ? p.variants : []
+                id: dbP.id,
+                name: dbP.name,
+                sku: dbP.sku,
+                barcode: dbP.barcode,
+                category: dbP.category || 'Chemises',
+                price: Number(dbP.price) || 0,
+                purchasePrice: Number(dbP.purchase_price) || 0,
+                image: dbImg,
+                images: dbImgs,
+                variants: dbVars
               })
             }
           }
@@ -708,7 +722,6 @@ export const useShop = defineStore('shop', {
 
     subscribeRealtime() {
       if (!supabase) return
-      // Bug fix: prevent duplicate subscriptions
       if (realtimeChannel) {
         try { supabase.removeChannel(realtimeChannel) } catch (_) {}
         realtimeChannel = null
@@ -771,6 +784,45 @@ export const useShop = defineStore('shop', {
                 if (idx < 0) this.expenses.unshift(payload)
                 else this.expenses.splice(idx, 1, payload)
               }
+            }
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (change) => {
+            const p = change.new
+            if (!p || !p.id) return
+            const img = p.image || (Array.isArray(p.images) && p.images[0] ? p.images[0] : '')
+            const imgs = Array.isArray(p.images) && p.images.length > 0 ? p.images : (img ? [img] : [])
+            const vars = Array.isArray(p.variants) ? p.variants : []
+            
+            const pIdx = this.products.findIndex(x => x.id === p.id)
+            if (pIdx >= 0) {
+              const current = cloneDeep(this.products[pIdx])
+              current.name = p.name || current.name
+              current.sku = p.sku || current.sku
+              current.barcode = p.barcode || current.barcode
+              current.category = p.category || current.category
+              current.price = Number(p.price) || current.price
+              current.purchasePrice = Number(p.purchase_price) || current.purchasePrice
+              if (img) current.image = img
+              if (imgs.length) current.images = imgs
+              if (vars.length) current.variants = vars
+              
+              localDb.products.put(current)
+              this.products.splice(pIdx, 1, current)
+            } else {
+              const newP = {
+                id: p.id,
+                name: p.name,
+                sku: p.sku,
+                barcode: p.barcode,
+                category: p.category || 'Chemises',
+                price: Number(p.price) || 0,
+                purchasePrice: Number(p.purchase_price) || 0,
+                image: img,
+                images: imgs,
+                variants: vars
+              }
+              localDb.products.put(newP)
+              this.products.push(newP)
             }
           })
           .subscribe()

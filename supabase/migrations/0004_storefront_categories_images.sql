@@ -2,6 +2,7 @@
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS category text;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS images jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS image text;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS variants jsonb DEFAULT '[]'::jsonb;
 
 -- Allow public read access to products & variants for storefront
 CREATE POLICY "public_read_products_storefront" ON public.products FOR SELECT TO anon USING (true);
