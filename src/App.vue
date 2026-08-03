@@ -7,6 +7,7 @@ import { createOzonParcel, getOzonParcelInfo } from './services/ozon'
 import { OZON_CITIES } from './services/ozonCities'
 import { generateOpenAiChatReply } from './services/openai'
 import { io } from 'socket.io-client'
+import { uploadProductImage } from './lib/supabase'
 import QRCode from 'qrcode'
 
 const currentViewMode = ref(localStorage.getItem('alpha-view-mode') || 'storefront')
@@ -473,25 +474,25 @@ async function handleVariantImage(e, idx) {
     
     for (const file of files) {
       try {
-        const compressed = await compressImage(file)
-        if (compressed) {
+        const imgUrl = (await uploadProductImage(file)) || (await compressImage(file))
+        if (imgUrl) {
           if (targetColor) {
             draft.value.variants.forEach(variant => {
               const vColor = (variant.presetColor || variant.color || '').trim().toLowerCase()
               if (vColor === targetColor) {
                 if (!variant.images) variant.images = []
-                variant.images.push(compressed)
-                if (!variant.image) variant.image = compressed
+                variant.images.push(imgUrl)
+                if (!variant.image) variant.image = imgUrl
               }
             })
           } else {
             if (!v.images) v.images = []
-            v.images.push(compressed)
-            if (!v.image) v.image = compressed
+            v.images.push(imgUrl)
+            if (!v.image) v.image = imgUrl
           }
         }
       } catch (err) {
-        alert("Variant Compression Error: " + err.message)
+        alert("Variant Image Error: " + err.message)
       }
     }
     if (e.target) e.target.value = ''
@@ -526,7 +527,7 @@ function removeVariantImage(vIdx, imgIdx) {
   }
 }
 
-function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.80) {
+function compressImage(file, maxWidth = 1600, maxHeight = 1600, quality = 0.85) {
   return new Promise((resolve) => {
     if (!file) return resolve('')
 
@@ -556,7 +557,6 @@ function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.80) 
         ctx.imageSmoothingEnabled = true
         ctx.imageSmoothingQuality = 'high'
         ctx.drawImage(img, 0, 0, width, height)
-        // Sharp HD WebP output (~50KB) for instant cross-device cloud sync
         resolve(canvas.toDataURL('image/webp', quality))
       }
       img.onerror = () => resolve(e.target.result)
@@ -575,13 +575,13 @@ async function handleProductImageUpload(e) {
 
     for (const file of files) {
       try {
-        const compressed = await compressImage(file)
-        if (compressed) {
-          draft.value.images.push(compressed)
-          if (!draft.value.image) draft.value.image = compressed
+        const imgUrl = (await uploadProductImage(file)) || (await compressImage(file))
+        if (imgUrl) {
+          draft.value.images.push(imgUrl)
+          if (!draft.value.image) draft.value.image = imgUrl
         }
       } catch (err) {
-        alert("Compression Error: " + err.message)
+        alert("Upload Error: " + err.message)
       }
     }
     if (e.target) e.target.value = ''

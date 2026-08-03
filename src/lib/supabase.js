@@ -10,3 +10,27 @@ if (!url || !key) {
 }
 
 export const supabase = url && key ? createClient(url, key) : null
+
+export async function uploadProductImage(file) {
+  if (!supabase || !file) return null
+  try {
+    const ext = file.name ? file.name.split('.').pop() : 'jpg'
+    const fileName = `img_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`
+    
+    // Upload to Supabase Storage bucket 'products'
+    const { data, error } = await supabase.storage
+      .from('products')
+      .upload(fileName, file, { cacheControl: '3600000', upsert: true })
+
+    if (error) {
+      console.warn('Supabase storage upload fallback to local base64:', error.message)
+      return null
+    }
+
+    const { data: publicData } = supabase.storage.from('products').getPublicUrl(fileName)
+    return publicData?.publicUrl || null
+  } catch (err) {
+    console.warn('uploadProductImage exception:', err.message)
+    return null
+  }
+}
