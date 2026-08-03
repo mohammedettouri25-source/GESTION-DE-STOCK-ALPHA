@@ -526,18 +526,9 @@ function removeVariantImage(vIdx, imgIdx) {
   }
 }
 
-function compressImage(file, maxWidth = 2400, maxHeight = 2400, quality = 0.95) {
+function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.80) {
   return new Promise((resolve) => {
     if (!file) return resolve('')
-
-    // Keep 100% original full-quality file for images under 2.5MB (zero compression loss)
-    if (file && file.size && file.size < 2.5 * 1024 * 1024) {
-      const reader = new FileReader()
-      reader.onload = (e) => resolve(e.target.result)
-      reader.onerror = () => resolve('')
-      reader.readAsDataURL(file)
-      return
-    }
 
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -565,8 +556,8 @@ function compressImage(file, maxWidth = 2400, maxHeight = 2400, quality = 0.95) 
         ctx.imageSmoothingEnabled = true
         ctx.imageSmoothingQuality = 'high'
         ctx.drawImage(img, 0, 0, width, height)
-        // High 0.95 quality output
-        resolve(canvas.toDataURL(file.type || 'image/jpeg', quality))
+        // Sharp HD WebP output (~50KB) for instant cross-device cloud sync
+        resolve(canvas.toDataURL('image/webp', quality))
       }
       img.onerror = () => resolve(e.target.result)
       img.src = e.target.result

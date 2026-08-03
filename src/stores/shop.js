@@ -191,7 +191,7 @@ export const useShop = defineStore('shop', {
         else this.products.splice(i, 1, plainP)
         await this.queue('products', plainP)
 
-        // Non-blocking Supabase sync
+        // Non-blocking Supabase sync with images & category
         if (supabase && navigator.onLine) {
           try {
             supabase.from('products').upsert({
@@ -202,6 +202,8 @@ export const useShop = defineStore('shop', {
               category: plainP.category || 'Chemises',
               price: plainP.price,
               purchase_price: plainP.purchasePrice,
+              image: plainP.image || '',
+              images: plainP.images || [],
               description: plainP.category || ''
             }, { onConflict: 'id' }).then(() => {}).catch(() => {})
           } catch (_) {}
@@ -571,8 +573,11 @@ export const useShop = defineStore('shop', {
                 name: job.payload.name || '',
                 sku: job.payload.sku || null,
                 barcode: job.payload.barcode || null,
+                category: job.payload.category || 'Chemises',
                 price: Number(job.payload.price) || 0,
                 purchase_price: Number(job.payload.purchasePrice) || 0,
+                image: job.payload.image || '',
+                images: job.payload.images || [],
                 description: job.payload.category || ''
               }, { onConflict: 'id' }).then(() => {}).catch(() => {})
             }
@@ -599,8 +604,7 @@ export const useShop = defineStore('shop', {
       if (!supabase) return
       try {
         const { data, error } = await supabase.from('app_sync').select('*')
-        if (error || !data || !data.length) return
-
+        
         const productsToPut = []
         const salesToPut = []
         const customersToPut = []
@@ -613,42 +617,65 @@ export const useShop = defineStore('shop', {
         const deletedSupplierIds = []
         const deletedExpenseIds = []
 
-        for (const item of data) {
-          const { entity_type, entity_id, payload } = item
-          if (!payload) continue
+        if (data && data.length) {
+          for (const item of data) {
+            const { entity_type, entity_id, payload } = item
+            if (!payload) continue
 
-          if (entity_type === 'products') {
-            if (payload.deleted) {
-              deletedProductIds.push(entity_id)
-            } else if (payload.id) {
-              // Ensure primary image & images array are defined
-              if (!payload.images) payload.images = payload.image ? [payload.image] : []
-              if (!payload.image && payload.images.length) payload.image = payload.images[0]
-              productsToPut.push(payload)
+            if (entity_type === 'products') {
+              if (payload.deleted) {
+                deletedProductIds.push(entity_id)
+              } else if (payload.id) {
+                // Ensure primary image & images array are defined
+                if (!payload.images) payload.images = payload.image ? [payload.image] : []
+                if (!payload.image && payload.images.length) payload.image = payload.images[0]
+                productsToPut.push(payload)
+              }
+            } else if (entity_type === 'sales') {
+              if (payload.deleted || payload.deleted === true) {
+                deletedSaleIds.push(entity_id)
+              } else if (payload.id) {
+                salesToPut.push(payload)
+              }
+            } else if (entity_type === 'customers') {
+              if (payload.deleted) {
+                deletedCustomerIds.push(entity_id)
+              } else if (payload.id) {
+                customersToPut.push(payload)
+              }
+            } else if (entity_type === 'suppliers') {
+              if (payload.deleted) {
+                deletedSupplierIds.push(entity_id)
+              } else if (payload.id) {
+                suppliersToPut.push(payload)
+              }
+            } else if (entity_type === 'expenses') {
+              if (payload.deleted) {
+                deletedExpenseIds.push(entity_id)
+              } else if (payload.id) {
+                expensesToPut.push(payload)
+              }
             }
-          } else if (entity_type === 'sales') {
-            if (payload.deleted || payload.deleted === true) {
-              deletedSaleIds.push(entity_id)
-            } else if (payload.id) {
-              salesToPut.push(payload)
-            }
-          } else if (entity_type === 'customers') {
-            if (payload.deleted) {
-              deletedCustomerIds.push(entity_id)
-            } else if (payload.id) {
-              customersToPut.push(payload)
-            }
-          } else if (entity_type === 'suppliers') {
-            if (payload.deleted) {
-              deletedSupplierIds.push(entity_id)
-            } else if (payload.id) {
-              suppliersToPut.push(payload)
-            }
-          } else if (entity_type === 'expenses') {
-            if (payload.deleted) {
-              deletedExpenseIds.push(entity_id)
-            } else if (payload.id) {
-              expensesToPut.push(payload)
+          }
+        }
+
+        // Fallback: If app_sync didn't provide products, pull from normalized products table
+        if (productsToPut.length === 0) {
+          const { data: dbProducts } = await supabase.from('products').select('*')
+          if (dbProducts && dbProducts.length > 0) {
+            for (const p of dbProducts) {
+              productsToPut.push({
+                id: p.id,
+                name: p.name,
+                sku: p.sku,
+                barcode: p.barcode,
+                category: p.category || 'Chemises',
+                price: Number(p.price) || 0,
+                purchasePrice: Number(p.purchase_price) || 0,
+                image: p.image || (Array.isArray(p.images) ? p.images[0] : ''),
+                images: Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []),
+                variants: Array.isArray(p.variants) ? p.variants : []
+              })
             }
           }
         }
