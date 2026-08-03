@@ -284,6 +284,45 @@ const filteredVariantsByColor = computed(() => {
   return activeProduct.value.variants
 })
 
+const uniqueVariantsBySize = computed(() => {
+  const variants = filteredVariantsByColor.value
+  if (!variants || !variants.length) return []
+
+  const resultMap = new Map()
+  for (const v of variants) {
+    const sizeName = (v.size || 'M').trim()
+    const sizeKey = sizeName.toUpperCase()
+    const vStock = Math.max(0, Number(v.stock) || 0)
+
+    if (!resultMap.has(sizeKey)) {
+      resultMap.set(sizeKey, {
+        size: sizeName,
+        aggregatedStock: vStock,
+        matchedVariants: [v],
+        selectedVariant: v
+      })
+    } else {
+      const existing = resultMap.get(sizeKey)
+      existing.aggregatedStock += vStock
+      existing.matchedVariants.push(v)
+      if ((Number(existing.selectedVariant.stock) || 0) <= 0 && vStock > 0) {
+        existing.selectedVariant = v
+      }
+    }
+  }
+  return Array.from(resultMap.values())
+})
+
+function onSizeSelect(item) {
+  if (!item || !item.matchedVariants) return
+  const targetVariant = item.matchedVariants.find(v => (Number(v.stock) || 0) > 0) || item.matchedVariants[0] || item.selectedVariant
+  if (targetVariant) {
+    selectedVariant.value = targetVariant
+    activeImageIndex.value = 0
+    startAutoScroll()
+  }
+}
+
 function getColorHex(colorName) {
   if (!colorName) return '#cbd5e1'
   const c = colorName.toLowerCase()
@@ -905,17 +944,17 @@ function getProductImagesList(product) {
             <label>{{ currentLang === 'ar' ? 'اختر المقاس:' : 'Choisir la taille (Size):' }}</label>
             <div class="size-buttons">
               <button 
-                v-for="v in filteredVariantsByColor" 
-                :key="v.id"
-                @click="selectedVariant = v; activeImageIndex = 0; startAutoScroll()"
-                :disabled="v.stock <= 0"
+                v-for="item in uniqueVariantsBySize" 
+                :key="item.size"
+                @click="onSizeSelect(item)"
+                :disabled="item.aggregatedStock <= 0"
                 :class="[
                   'size-btn',
-                  selectedVariant?.id === v.id ? 'active' : '',
-                  v.stock <= 0 ? 'out-of-stock' : ''
+                  (selectedVariant && (selectedVariant.size || '').trim().toUpperCase() === item.size.trim().toUpperCase()) ? 'active' : '',
+                  item.aggregatedStock <= 0 ? 'out-of-stock' : ''
                 ]"
               >
-                {{ v.size || 'M' }}
+                {{ item.size || 'M' }}
               </button>
             </div>
           </div>

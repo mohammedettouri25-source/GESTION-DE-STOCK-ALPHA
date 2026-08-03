@@ -201,7 +201,7 @@ export const useShop = defineStore('shop', {
 
   actions: {
     async init() {
-      // Load local data first for fast startup & auto-clean any corrupted/deleted records
+      // Load local data first for INSTANT (0ms) startup & render
       this.products = await localDb.products.toArray()
 
       const rawSales = await localDb.sales.toArray()
@@ -219,11 +219,6 @@ export const useShop = defineStore('shop', {
       this.suppliers = await localDb.suppliers?.toArray().catch(() => []) || []
       this.expenses = await localDb.expenses?.toArray().catch(() => []) || []
 
-      // Pull from Supabase BEFORE checking initial seed — so cross-browser data takes priority
-      if (navigator.onLine) {
-        await this.pullFromSupabase()
-      }
-
       // Only seed ONCE on brand-new fresh database install, never again if user deletes their stock
       if (!this.products.length) {
         const hasSeededBefore = localStorage.getItem('alpha_has_seeded') === 'true'
@@ -236,9 +231,13 @@ export const useShop = defineStore('shop', {
         localStorage.setItem('alpha_has_seeded', 'true')
       }
 
+      // Non-blocking background cloud pull & sync so page opens INSTANTLY
       if (navigator.onLine) {
-        await this.sync()
-        this.subscribeRealtime()
+        Promise.resolve().then(async () => {
+          await this.pullFromSupabase()
+          await this.sync()
+          this.subscribeRealtime()
+        })
       }
 
       window.addEventListener('online', async () => {
@@ -662,24 +661,6 @@ export const useShop = defineStore('shop', {
           const entityId = String(job.payload?.id || job.id)
           let syncPayload = cloneDeep(job.payload);
           
-          // CRITICAL FIX: Strip base64 images from payload to prevent massive database sync payloads freezing the site
-          if (syncPayload && typeof syncPayload === 'object') {
-            if (job.table === 'products') {
-              if (syncPayload.image && syncPayload.image.startsWith('data:image')) syncPayload.image = ''
-              if (syncPayload.images && Array.isArray(syncPayload.images)) {
-                syncPayload.images = syncPayload.images.filter(img => !img.startsWith('data:image'))
-              }
-              if (syncPayload.variants && Array.isArray(syncPayload.variants)) {
-                syncPayload.variants.forEach(v => {
-                  if (v.image && v.image.startsWith('data:image')) v.image = ''
-                  if (v.images && Array.isArray(v.images)) {
-                    v.images = v.images.filter(img => !img.startsWith('data:image'))
-                  }
-                })
-              }
-            }
-          }
-          
           const { error } = await supabase
             .from('app_sync')
             .upsert(
@@ -691,7 +672,7 @@ export const useShop = defineStore('shop', {
             else this.notify(`Erreur Sync Supabase : ${error.message}`)
             console.error('Supabase sync error:', error)
             
-            // If the payload is too large or times out (57014), we MUST skip it so it doesn't block the entire queue.
+            // If the payload is too large or times out (57014), skip it to unblock queue
             if (error.code === '57014' || String(error.message).includes('500') || String(error.message).includes('timeout') || String(error.message).includes('large')) {
               console.warn('Skipping massive payload job to unblock queue:', job.id)
               await localDb.queue.delete(job.id)
@@ -740,82 +721,79 @@ export const useShop = defineStore('shop', {
         const { data, error } = await supabase.from('app_sync').select('*')
         if (error || !data || !data.length) return
 
+        const productsToPut = []
+        const salesToPut = []
+        const customersToPut = []
+        const suppliersToPut = []
+        const expensesToPut = []
+
+        const deletedProductIds = []
+        const deletedSaleIds = []
+        const deletedCustomerIds = []
+        const deletedSupplierIds = []
+        const deletedExpenseIds = []
+
         for (const item of data) {
           const { entity_type, entity_id, payload } = item
           if (!payload) continue
 
           if (entity_type === 'products') {
             if (payload.deleted) {
-              await localDb.products.delete(entity_id)
-              this.products = this.products.filter(x => x.id !== entity_id)
+              deletedProductIds.push(entity_id)
             } else if (payload.id) {
-              const localItem = await localDb.products.get(entity_id)
-              // Restore images if they were stripped from payload
-              if (localItem) {
-                if (!payload.image && localItem.image) payload.image = localItem.image
-                if ((!payload.images || !payload.images.length) && localItem.images) payload.images = localItem.images
-                
-                if (payload.variants && localItem.variants) {
-                  payload.variants.forEach((v, i) => {
-                    const localV = localItem.variants[i]
-                    if (localV) {
-                      if (!v.image && localV.image) v.image = localV.image
-                      if ((!v.images || !v.images.length) && localV.images) v.images = localV.images
-                    }
-                  })
-                }
-              }
-
-              await localDb.products.put(payload)
-              const idx = this.products.findIndex(x => x.id === payload.id)
-              if (idx < 0) this.products.push(payload)
-              else this.products.splice(idx, 1, payload)
+              // Ensure primary image & images array are defined
+              if (!payload.images) payload.images = payload.image ? [payload.image] : []
+              if (!payload.image && payload.images.length) payload.image = payload.images[0]
+              productsToPut.push(payload)
             }
           } else if (entity_type === 'sales') {
             if (payload.deleted || payload.deleted === true) {
-              await localDb.sales.delete(entity_id)
-              this.sales = this.sales.filter(x => x.id !== entity_id)
+              deletedSaleIds.push(entity_id)
             } else if (payload.id) {
-              await localDb.sales.put(payload)
-              const idx = this.sales.findIndex(x => x.id === payload.id)
-              if (idx < 0) this.sales.unshift(payload)
-              else this.sales.splice(idx, 1, payload)
+              salesToPut.push(payload)
             }
           } else if (entity_type === 'customers') {
             if (payload.deleted) {
-              await localDb.customers.delete(entity_id)
-              this.customers = this.customers.filter(x => x.id !== entity_id)
+              deletedCustomerIds.push(entity_id)
             } else if (payload.id) {
-              await localDb.customers.put(payload)
-              const idx = this.customers.findIndex(x => x.id === payload.id)
-              if (idx < 0) this.customers.unshift(payload)
-              else this.customers.splice(idx, 1, payload)
+              customersToPut.push(payload)
             }
           } else if (entity_type === 'suppliers') {
             if (payload.deleted) {
-              await localDb.suppliers?.delete(entity_id).catch(() => {})
-              this.suppliers = this.suppliers.filter(x => x.id !== entity_id)
+              deletedSupplierIds.push(entity_id)
             } else if (payload.id) {
-              await localDb.suppliers?.put(payload).catch(() => {})
-              const idx = this.suppliers.findIndex(x => x.id === payload.id)
-              if (idx < 0) this.suppliers.unshift(payload)
-              else this.suppliers.splice(idx, 1, payload)
+              suppliersToPut.push(payload)
             }
           } else if (entity_type === 'expenses') {
             if (payload.deleted) {
-              await localDb.expenses?.delete(entity_id).catch(() => {})
-              this.expenses = this.expenses.filter(x => x.id !== entity_id)
+              deletedExpenseIds.push(entity_id)
             } else if (payload.id) {
-              await localDb.expenses?.put(payload).catch(() => {})
-              const idx = this.expenses.findIndex(x => x.id === payload.id)
-              if (idx < 0) this.expenses.unshift(payload)
-              else this.expenses.splice(idx, 1, payload)
+              expensesToPut.push(payload)
             }
           }
         }
 
-        // Re-sort sales by date (newest first)
-        this.sales.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        // Perform batch deletes
+        for (const id of deletedProductIds) await localDb.products.delete(id).catch(() => {})
+        for (const id of deletedSaleIds) await localDb.sales.delete(id).catch(() => {})
+        for (const id of deletedCustomerIds) await localDb.customers.delete(id).catch(() => {})
+        for (const id of deletedSupplierIds) await localDb.suppliers?.delete(id).catch(() => {})
+        for (const id of deletedExpenseIds) await localDb.expenses?.delete(id).catch(() => {})
+
+        // Perform batch puts for fast, single-transaction IndexedDB updates
+        if (productsToPut.length) await localDb.products.bulkPut(productsToPut).catch(() => {})
+        if (salesToPut.length) await localDb.sales.bulkPut(salesToPut).catch(() => {})
+        if (customersToPut.length) await localDb.customers.bulkPut(customersToPut).catch(() => {})
+        if (suppliersToPut.length && localDb.suppliers) await localDb.suppliers.bulkPut(suppliersToPut).catch(() => {})
+        if (expensesToPut.length && localDb.expenses) await localDb.expenses.bulkPut(expensesToPut).catch(() => {})
+
+        // Update Pinia state in one single reactive update
+        this.products = await localDb.products.toArray()
+        const allSales = await localDb.sales.toArray()
+        this.sales = allSales.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        this.customers = await localDb.customers.toArray()
+        this.suppliers = await localDb.suppliers?.toArray().catch(() => []) || []
+        this.expenses = await localDb.expenses?.toArray().catch(() => []) || []
       } catch (err) {
         console.warn('pullFromSupabase failed:', err.message)
       }
