@@ -120,6 +120,15 @@ export const useShop = defineStore('shop', {
         })
       }
 
+      // Background auto-refresh timer to poll for new orders continuously
+      if (typeof window !== 'undefined' && !window._alphashopPollInterval) {
+        window._alphashopPollInterval = setInterval(() => {
+          if (navigator.onLine) {
+            this.pullFromSupabase().catch(() => {})
+          }
+        }, 15000)
+      }
+
       window.addEventListener('online', async () => {
         this.online = true
         await this.pullFromSupabase()
@@ -319,8 +328,16 @@ export const useShop = defineStore('shop', {
           number: saleNum,
           trackingId: details.trackingId || details.number || saleNum,
           createdAt: new Date().toISOString(),
-          items: this.cart.map(({ productId, variantId, sku, name, variant, price, quantity }) => ({
-            productId, variantId, sku, name, variant: variant ? cloneDeep(variant) : null, price, quantity
+          items: this.cart.map(({ productId, variantId, sku, name, variant, color, size, price, quantity }) => ({
+            productId,
+            variantId,
+            sku,
+            name,
+            color: color || null,
+            size: size || null,
+            variant: variant ? cloneDeep(variant) : (color || size ? `${color || ''} · ${size || ''}`.trim().replace(/^·\s*/, '').replace(/\s*·$/, '') : null),
+            price,
+            quantity
           })),
           subtotal: this.cartTotal,
           discount,

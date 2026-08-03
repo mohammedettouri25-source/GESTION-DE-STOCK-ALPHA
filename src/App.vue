@@ -2272,9 +2272,30 @@ onMounted(async () => {
                 <small>{{sale.createdAt ? new Date(sale.createdAt).toLocaleString('fr-MA') : '—'}}</small>
               </span>
               <span>
-                <b>{{sale.customer?.name||'Vente comptoir'}}</b>
-                <small v-if="sale.customer?.phone" style="display:block; color:#475569;">📞 {{sale.customer.phone}} {{sale.customer?.city ? '· ' + sale.customer.city : ''}}</small>
-                <small v-if="sale.shipment?.tracking">Ozon : {{sale.shipment.tracking}}</small>
+                <b style="font-size:13px; color:#0f172a;">{{sale.customer?.name||'Vente comptoir'}}</b>
+                <small v-if="sale.customer?.phone" style="display:block; color:#475569; margin-top:2px;">📞 {{sale.customer.phone}} {{sale.customer?.city ? '· ' + sale.customer.city : ''}}</small>
+                <small v-if="sale.customer?.address" style="display:block; color:#64748b; font-size:11px;">📍 {{sale.customer.address}}</small>
+
+                <!-- Detailed Items List with Color & Size badges -->
+                <div v-if="sale.items && sale.items.length" style="margin-top:6px; display:flex; flex-direction:column; gap:4px; max-width:340px;">
+                  <div 
+                    v-for="(item, idx) in sale.items" 
+                    :key="idx" 
+                    style="font-size:11px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:4px 8px; display:flex; align-items:center; justify-content:space-between; gap:6px;"
+                  >
+                    <span style="font-weight:700; color:#1e293b; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                      <span>📦 {{ item.name }}</span>
+                      <span v-if="item.color || item.size || item.variant" style="font-size:10px; color:#0369a1; font-weight:800; background:#e0f2fe; border:1px solid #bae6fd; padding:1px 6px; border-radius:4px;">
+                        {{ [item.color ? `🎨 ${item.color}` : '', item.size ? `📏 ${item.size}` : ''].filter(Boolean).join(' | ') || item.variant }}
+                      </span>
+                    </span>
+                    <span style="font-weight:800; color:#0f172a; white-space:nowrap;">
+                      x{{ item.quantity || 1 }} — {{ (item.price || 0) * (item.quantity || 1) }} DH
+                    </span>
+                  </div>
+                </div>
+
+                <small v-if="sale.shipment?.tracking" style="display:block; margin-top:4px; color:#2563eb; font-weight:700;">Ozon : {{sale.shipment.tracking}}</small>
               </span>
               <strong>{{money(sale.total)}}</strong>
               <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">

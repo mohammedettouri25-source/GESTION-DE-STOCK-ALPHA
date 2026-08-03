@@ -622,7 +622,26 @@ async function submitOrder() {
 
 function getWhatsAppOrderLink(order) {
   const phone = '212641432859'
-  const msg = `Salam ALPHA SHOP! N9ad nttaba3 l-commande dyali:\n📦 N° Commande: ${order.trackingId}\n👤 Nom: ${order.name}\n📍 Ville: ${order.city}\n💰 Total: ${order.total} DH`
+  const itemsText = (order.items || []).map(item => {
+    const colorStr = item.color ? `اللون (Couleur): ${item.color}` : ''
+    const sizeStr = item.size ? `المقاس (Taille): ${item.size}` : ''
+    const detailsStr = [colorStr, sizeStr].filter(Boolean).join(' | ') || (item.variant ? `(${item.variant})` : '')
+    return `• ${item.name}${detailsStr ? ` [${detailsStr}]` : ''} x${item.quantity || 1} = ${(item.price || 0) * (item.quantity || 1)} DH`
+  }).join('\n')
+
+  const msg = `Salam ALPHA SHOP! N9ad nttaba3 l-commande dyali:
+
+📦 N° Commande: ${order.trackingId || order.number}
+👤 Nom: ${order.name}
+📞 Tél: ${order.phone}
+📍 Ville: ${order.city}
+🏠 Adresse: ${order.address || '—'}
+
+🛍️ المنتجات (Produits):
+${itemsText || '—'}
+
+💰 Total COD: ${order.total} DH`
+
   return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
 }
 
