@@ -462,8 +462,19 @@ function _openProductFromUrl() {
 }
 
 watch(() => shop.products, (prods) => {
-  if (Array.isArray(prods) && prods.length > 0 && currentPage.value !== 'product') {
-    _openProductFromUrl()
+  if (Array.isArray(prods) && prods.length > 0) {
+    if (currentPage.value !== 'product') {
+      _openProductFromUrl()
+    } else if (activeProduct.value && activeProduct.value.id) {
+      const updated = prods.find(p => String(p.id) === String(activeProduct.value.id))
+      if (updated) {
+        activeProduct.value = updated
+        if (selectedVariant.value) {
+          const updatedV = (updated.variants || []).find(v => v.id === selectedVariant.value.id || (v.color === selectedVariant.value.color && v.size === selectedVariant.value.size))
+          if (updatedV) selectedVariant.value = updatedV
+        }
+      }
+    }
   }
 }, { immediate: true, deep: true })
 

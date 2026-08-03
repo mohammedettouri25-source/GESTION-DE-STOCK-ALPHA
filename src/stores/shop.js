@@ -677,23 +677,24 @@ export const useShop = defineStore('shop', {
           }
         }
 
-        // Always query normalized products table to merge missing/new images & variants across devices
+        // Always query normalized products table to merge latest prices, images & variants across devices
         const { data: dbProducts } = await supabase.from('products').select('*')
         if (dbProducts && dbProducts.length > 0) {
           for (const dbP of dbProducts) {
-            const existingIdx = productsToPut.findIndex(p => p.id === dbP.id)
             const dbImg = dbP.image || (Array.isArray(dbP.images) && dbP.images[0] ? dbP.images[0] : '')
             const dbImgs = Array.isArray(dbP.images) && dbP.images.length > 0 ? dbP.images : (dbImg ? [dbImg] : [])
             const dbVars = Array.isArray(dbP.variants) ? dbP.variants : []
 
+            const existingIdx = productsToPut.findIndex(p => p.id === dbP.id)
             if (existingIdx >= 0) {
-              if (!productsToPut[existingIdx].image && dbImg) productsToPut[existingIdx].image = dbImg
-              if ((!productsToPut[existingIdx].images || !productsToPut[existingIdx].images.length) && dbImgs.length) {
-                productsToPut[existingIdx].images = dbImgs
-              }
-              if (dbVars.length && (!productsToPut[existingIdx].variants || !productsToPut[existingIdx].variants.length)) {
-                productsToPut[existingIdx].variants = dbVars
-              }
+              if (dbVars.length > 0) productsToPut[existingIdx].variants = dbVars
+              if (dbImgs.length > 0) productsToPut[existingIdx].images = dbImgs
+              if (dbImg) productsToPut[existingIdx].image = dbImg
+              if (dbP.name) productsToPut[existingIdx].name = dbP.name
+              if (dbP.price !== undefined) productsToPut[existingIdx].price = Number(dbP.price) || 0
+              if (dbP.purchase_price !== undefined) productsToPut[existingIdx].purchasePrice = Number(dbP.purchase_price) || 0
+              if (dbP.category) productsToPut[existingIdx].category = dbP.category
+              if (dbP.hidden !== undefined) productsToPut[existingIdx].hidden = Boolean(dbP.hidden)
             } else {
               productsToPut.push({
                 id: dbP.id,
@@ -705,7 +706,8 @@ export const useShop = defineStore('shop', {
                 purchasePrice: Number(dbP.purchase_price) || 0,
                 image: dbImg,
                 images: dbImgs,
-                variants: dbVars
+                variants: dbVars,
+                hidden: Boolean(dbP.hidden)
               })
             }
           }
@@ -772,6 +774,32 @@ export const useShop = defineStore('shop', {
       try {
         realtimeChannel = supabase
           .channel('alphashop-sync')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (change) => {
+            const dbP = change.new
+            if (!dbP || !dbP.id) return
+            const dbImg = dbP.image || (Array.isArray(dbP.images) && dbP.images[0] ? dbP.images[0] : '')
+            const dbImgs = Array.isArray(dbP.images) && dbP.images.length > 0 ? dbP.images : (dbImg ? [dbImg] : [])
+            const dbVars = Array.isArray(dbP.variants) ? dbP.variants : []
+            
+            const updated = {
+              id: dbP.id,
+              name: dbP.name,
+              sku: dbP.sku,
+              barcode: dbP.barcode,
+              category: dbP.category || 'Chemises',
+              price: Number(dbP.price) || 0,
+              purchasePrice: Number(dbP.purchase_price) || 0,
+              image: dbImg,
+              images: dbImgs,
+              variants: dbVars,
+              hidden: Boolean(dbP.hidden)
+            }
+
+            localDb.products.put(updated)
+            const idx = this.products.findIndex(x => x.id === dbP.id)
+            if (idx < 0) this.products.push(updated)
+            else this.products.splice(idx, 1, updated)
+          })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'app_sync' }, (change) => {
             const record = change.new
             if (!record || !record.entity_type || !record.payload) return
