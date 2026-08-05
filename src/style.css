@@ -3005,6 +3005,19 @@ h2 {
     min-height: 36px !important;
   }
 }
-
-
-
+/* All Product Titles Uppercase Across Storefront & Dashboard */
+.product-title,
+.product-card h3,
+.product-card-modern .product-title,
+.single-product-container h1,
+.detail-header h1,
+.product-details h1,
+.related-card h4,
+.cart-item-info h4,
+.cart-item-name,
+.summary-item-name,
+.prod-name,
+.product-name-title {
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px;
+}

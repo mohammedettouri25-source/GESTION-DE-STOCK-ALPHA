@@ -1105,9 +1105,12 @@ function getProductImagesList(product) {
         </div>
       </div>
 
-      <!-- Related Products Carousel -->
+      <!-- Related Products Showcase -->
       <section v-if="relatedProducts.length > 0" class="related-section">
-        <h2>{{ currentLang === 'ar' ? 'منتجات ذات صلة' : 'Produits Similaires' }}</h2>
+        <div class="related-header">
+          <span class="sparkle-badge">✨ {{ currentLang === 'ar' ? 'تشكيلة مميزة' : 'Collection Recommandée' }}</span>
+          <h2>{{ currentLang === 'ar' ? 'منتجات قد تعجبك (ذات صلة)' : 'Produits Similaires' }}</h2>
+        </div>
         
         <div class="related-grid">
           <div 
@@ -1117,11 +1120,20 @@ function getProductImagesList(product) {
             class="related-card"
           >
             <div class="img-box">
-              <img :src="getProductImage(p)" :alt="p.name" />
+              <img :src="getProductImage(p)" :alt="p.name" loading="lazy" />
+              <span class="related-category-pill">{{ p.category || 'Collection' }}</span>
+              <div class="hover-overlay">
+                <span class="view-btn-pill">
+                  <Eye :size="14" /> {{ currentLang === 'ar' ? 'معاينة' : 'Découvrir' }}
+                </span>
+              </div>
             </div>
             <div class="body">
-              <h4>{{ p.name }}</h4>
-              <strong>{{ p.price }} DH</strong>
+              <h4 class="product-title">{{ p.name }}</h4>
+              <div class="price-row">
+                <strong class="related-price">{{ p.price }} <small>DH</small></strong>
+                <span class="action-arrow">→</span>
+              </div>
             </div>
           </div>
         </div>
@@ -2340,59 +2352,188 @@ function getProductImagesList(product) {
   shrink: 0;
 }
 
-/* Related */
+/* Related Products Styling */
 .related-section {
-  margin-top: 40px;
+  margin-top: 52px;
   border-top: 1px solid #e5e5e7;
-  padding-top: 24px;
+  padding-top: 36px;
 }
+
+.related-header {
+  margin-bottom: 22px;
+}
+
+.related-header .sparkle-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .related-section h2 {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 800;
-  margin: 0 0 16px;
+  color: #1d1d1f;
+  margin: 4px 0 0;
+  letter-spacing: -0.5px;
 }
+
 .related-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 16px;
 }
-@media (min-width: 640px) {
+
+@media (min-width: 768px) {
   .related-grid {
     grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
   }
 }
+
 .related-card {
   background-color: #ffffff;
-  border: 1px solid #e5e5e7;
-  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 18px;
   overflow: hidden;
   cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+  display: flex;
+  flex-direction: column;
 }
+
+.related-card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(37, 99, 235, 0.35);
+  box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.12);
+}
+
 .related-card .img-box {
+  position: relative;
   aspect-ratio: 4/5;
   background-color: #f5f5f7;
+  overflow: hidden;
 }
+
 .related-card img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.related-card .body {
-  padding: 10px;
+
+.related-card:hover img {
+  transform: scale(1.06);
 }
-.related-card h4 {
+
+.related-category-pill {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  color: #1d1d1f;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.related-card .hover-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.related-card:hover .hover-overlay {
+  opacity: 1;
+}
+
+.view-btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  color: #1d1d1f;
   font-size: 12px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateY(6px);
+  transition: transform 0.3s ease;
+}
+
+.related-card:hover .view-btn-pill {
+  transform: translateY(0);
+}
+
+.related-card .body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-grow: 1;
+  background: #ffffff;
+}
+
+.related-card h4.product-title {
+  font-size: 13px;
+  font-weight: 700;
   margin: 0;
   color: #1d1d1f;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px;
 }
-.related-card strong {
-  font-size: 13px;
+
+.related-card .price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.related-card .related-price {
+  font-size: 15px;
+  font-weight: 800;
   color: #1d1d1f;
-  display: block;
-  margin-top: 2px;
+}
+
+.related-card .related-price small {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6e6e73;
+}
+
+.related-card .action-arrow {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2563eb;
+  transition: transform 0.2s ease;
+}
+
+.related-card:hover .action-arrow {
+  transform: translateX(3px);
 }
 
 /* Modals & Backdrops */
