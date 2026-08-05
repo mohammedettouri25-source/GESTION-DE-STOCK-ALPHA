@@ -787,14 +787,14 @@ function getProductImagesList(product) {
         <!-- Right: Actions Buttons -->
         <div class="nav-actions">
           
-          <!-- Sidebar Menu Trigger Button -->
+          <!-- Sidebar Menu Trigger Button in Navbar Header -->
           <button 
             @click="sidebarOpen = true"
             class="nav-sidebar-trigger-btn"
             :title="currentLang === 'ar' ? 'القائمة والتصنيفات' : 'Catégories & Filtres'"
           >
             <SlidersHorizontal :size="16" />
-            <span>{{ currentLang === 'ar' ? 'التصنيفات' : 'CATÉGORIES' }}</span>
+            <span>{{ currentLang === 'ar' ? 'التصنيفات والفلاتر' : 'CATÉGORIES & FILTRES' }}</span>
             <span v-if="selectedCategory !== 'Tous' || selectedSize !== 'Tous'" class="nav-active-dot"></span>
           </button>
 
@@ -883,15 +883,8 @@ function getProductImagesList(product) {
       <!-- APPLE-STYLE TOP HORIZONTAL CATEGORY & FILTER BAR -->
       <div class="store-layout-container">
         
-        <!-- Horizontal Category Pills Scrollbar with Menu Trigger -->
+        <!-- Horizontal Category Pills Scrollbar -->
         <div class="horizontal-pills-bar margin-bottom-md">
-          <button 
-            @click="sidebarOpen = true"
-            class="cat-pill-btn open-sidebar-pill-btn"
-          >
-            <SlidersHorizontal :size="15" />
-            <span>{{ currentLang === 'ar' ? 'جميع التصنيفات' : 'MENU CATÉGORIES' }}</span>
-          </button>
           <button 
             v-for="cat in categories" 
             :key="cat.id"
@@ -907,14 +900,7 @@ function getProductImagesList(product) {
       <main class="fullwidth-products-main">
         
         <div class="catalogue-header-info">
-          <div class="header-menu-row">
-            <button @click="sidebarOpen = true" class="open-sidebar-menu-btn">
-              <SlidersHorizontal :size="16" />
-              <span>{{ currentLang === 'ar' ? 'التصنيفات والفلاتر' : 'CATÉGORIES & FILTRES' }}</span>
-              <span v-if="selectedCategory !== 'Tous' || selectedSize !== 'Tous'" class="active-dot-badge"></span>
-            </button>
-            <h2>{{ (selectedCategory !== 'Tous' ? selectedCategory : (currentLang === 'ar' ? 'جميع الملابس والتشكيلات' : 'TOUS LES PRODUITS')).toUpperCase() }}</h2>
-          </div>
+          <h2>{{ (selectedCategory !== 'Tous' ? selectedCategory : (currentLang === 'ar' ? 'جميع الملابس والتشكيلات' : 'TOUS LES PRODUITS')).toUpperCase() }}</h2>
           <span class="count-badge">{{ filteredProducts.length }} {{ currentLang === 'ar' ? 'منتج' : 'PRODUITS' }}</span>
         </div>
 
@@ -2546,8 +2532,8 @@ function getProductImagesList(product) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(135deg, #0f172a, #1e293b);
-  color: #ffffff;
+  background: #ffffff;
+  color: #1d1d1f;
 }
 
 .drawer-header .header-title-box {
@@ -2559,7 +2545,7 @@ function getProductImagesList(product) {
 .drawer-header .drawer-badge {
   font-size: 10px;
   font-weight: 800;
-  color: #60a5fa;
+  color: #2563eb;
   letter-spacing: 0.8px;
   text-transform: uppercase;
 }
@@ -2567,16 +2553,16 @@ function getProductImagesList(product) {
 .drawer-header h3 {
   font-size: 16px;
   font-weight: 800;
-  color: #ffffff;
+  color: #1d1d1f;
   margin: 0;
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
 
 .close-drawer-btn {
-  background: rgba(255, 255, 255, 0.12);
-  border: none;
-  color: #ffffff;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #1d1d1f;
   width: 34px;
   height: 34px;
   border-radius: 50%;
@@ -2588,7 +2574,7 @@ function getProductImagesList(product) {
 }
 
 .close-drawer-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.1);
   transform: scale(1.05);
 }
 
