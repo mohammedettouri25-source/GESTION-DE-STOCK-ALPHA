@@ -619,6 +619,9 @@ async function submitOrder() {
       items: cartSnapshot
     }
 
+    // Automatically send WhatsApp confirmation message to customer's phone from 0641432859
+    sendAutoWhatsAppNotification(orderSuccess.value)
+
     shop.clearCart()
     checkoutOpen.value = false
     cartOpen.value = false
@@ -628,6 +631,52 @@ async function submitOrder() {
     shop.notify('Erreur lors de la validation. Veuillez réessayer.')
   } finally {
     isSubmitting.value = false
+  }
+}
+
+async function sendAutoWhatsAppNotification(order) {
+  if (!order || !order.phone) return
+
+  let phoneNum = String(order.phone).replace(/\D/g, '')
+  if (phoneNum.startsWith('0')) {
+    phoneNum = '212' + phoneNum.substring(1)
+  }
+
+  const itemsText = (order.items || []).map(item => {
+    const colorStr = item.color ? `اللون: ${item.color}` : ''
+    const sizeStr = item.size ? `المقاس: ${item.size}` : ''
+    const detailsStr = [colorStr, sizeStr].filter(Boolean).join(' | ') || (item.variant ? `(${item.variant})` : '')
+    return `• ${item.name}${detailsStr ? ` [${detailsStr}]` : ''} x${item.quantity || 1} (${(item.price || 0) * (item.quantity || 1)} DH)`
+  }).join('\n')
+
+  const msg = `Salam ${order.name} 👋
+تم تسجيل طلبكم بنجاح في ALPHA SHOP! 🛍️
+
+📦 رقم الطلب: ${order.trackingId || order.number}
+📍 التسليم إلى: ${order.city} ${order.address ? `- ${order.address}` : ''}
+
+🛍️ تفاصيل الطلبية:
+${itemsText || '—'}
+
+💰 المجموع الكلي: ${order.total} DH
+
+سنقوم بالتواصل معكم هاتفياً لتأكيد الشحن والتسليم.
+لأي استفسار يمكنك التواصل معنا عبر هذا الرقم: 0641432859 📱`
+
+  try {
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
+    const waUrl = isHttps ? 'https://localhost:3001/send-message' : 'http://localhost:3001/send-message'
+
+    await fetch(waUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: phoneNum,
+        message: msg
+      })
+    })
+  } catch (e) {
+    console.warn('Could not send automated WhatsApp message via backend:', e.message)
   }
 }
 

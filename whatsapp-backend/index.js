@@ -209,14 +209,21 @@ app.post('/bot-settings', (req, res) => {
 });
 
 app.post('/send-message', async (req, res) => {
-    const { phone, message } = req.body;
-    if (!isConnected) return res.status(400).json({ error: 'Client not connected' });
+    let { phone, message } = req.body;
+    if (!phone || !message) return res.status(400).json({ error: 'Missing phone or message' });
+    if (!isConnected) return res.status(400).json({ error: 'WhatsApp client not connected' });
     
     try {
-        const chatId = phone.includes('@c.us') ? phone : `${phone}@c.us`;
+        let cleanPhone = String(phone).replace(/\D/g, '');
+        if (cleanPhone.startsWith('0')) {
+            cleanPhone = '212' + cleanPhone.substring(1);
+        }
+        const chatId = cleanPhone.includes('@c.us') ? cleanPhone : `${cleanPhone}@c.us`;
         await client.sendMessage(chatId, message);
-        res.json({ success: true });
+        console.log(`✅ Automated WhatsApp message sent to ${cleanPhone}`);
+        res.json({ success: true, target: cleanPhone });
     } catch (err) {
+        console.error('❌ Error sending WhatsApp message:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
