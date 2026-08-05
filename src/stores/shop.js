@@ -206,6 +206,11 @@ export const useShop = defineStore('shop', {
         // Non-blocking Supabase sync with images, category & variants
         if (supabase && navigator.onLine) {
           try {
+            const imagesList = Array.isArray(plainP.images) && plainP.images.length > 0
+              ? plainP.images
+              : (plainP.image ? [plainP.image] : [])
+            const primaryImg = imagesList[0] || plainP.image || ''
+
             supabase.from('products').upsert({
               id: plainP.id,
               name: plainP.name || '',
@@ -214,8 +219,8 @@ export const useShop = defineStore('shop', {
               category: plainP.category || 'Chemises',
               price: plainP.price,
               purchase_price: plainP.purchasePrice,
-              image: plainP.image || '',
-              images: plainP.images || [],
+              image: primaryImg,
+              images: imagesList,
               variants: plainP.variants || [],
               description: plainP.category || ''
             }, { onConflict: 'id' }).then(() => {}).catch(() => {})
@@ -589,6 +594,11 @@ export const useShop = defineStore('shop', {
             if (job.payload.deleted) {
               await supabase.from('products').delete().eq('id', entityId).then(() => {}).catch(() => {})
             } else {
+              const imagesList = Array.isArray(job.payload.images) && job.payload.images.length > 0
+                ? job.payload.images
+                : (job.payload.image ? [job.payload.image] : [])
+              const primaryImg = imagesList[0] || job.payload.image || ''
+
               await supabase.from('products').upsert({
                 id: job.payload.id,
                 name: job.payload.name || '',
@@ -597,8 +607,8 @@ export const useShop = defineStore('shop', {
                 category: job.payload.category || 'Chemises',
                 price: Number(job.payload.price) || 0,
                 purchase_price: Number(job.payload.purchasePrice) || 0,
-                image: job.payload.image || '',
-                images: job.payload.images || [],
+                image: primaryImg,
+                images: imagesList,
                 variants: job.payload.variants || [],
                 description: job.payload.category || ''
               }, { onConflict: 'id' }).then(() => {}).catch(() => {})
@@ -692,7 +702,7 @@ export const useShop = defineStore('shop', {
           }
         }
 
-        // Merge normalized products table
+        // Merge normalized products table safely without overwriting updated images/payloads from app_sync
         if (dbProducts && dbProducts.length > 0) {
           for (const dbP of dbProducts) {
             const dbImg = dbP.image || (Array.isArray(dbP.images) && dbP.images[0] ? dbP.images[0] : '')
@@ -701,14 +711,22 @@ export const useShop = defineStore('shop', {
 
             const existingIdx = productsToPut.findIndex(p => p.id === dbP.id)
             if (existingIdx >= 0) {
-              if (dbVars.length > 0) productsToPut[existingIdx].variants = dbVars
-              if (dbImgs.length > 0) productsToPut[existingIdx].images = dbImgs
-              if (dbImg) productsToPut[existingIdx].image = dbImg
-              if (dbP.name) productsToPut[existingIdx].name = dbP.name
-              if (dbP.price !== undefined) productsToPut[existingIdx].price = Number(dbP.price) || 0
-              if (dbP.purchase_price !== undefined) productsToPut[existingIdx].purchasePrice = Number(dbP.purchase_price) || 0
-              if (dbP.category) productsToPut[existingIdx].category = dbP.category
-              if (dbP.hidden !== undefined) productsToPut[existingIdx].hidden = Boolean(dbP.hidden)
+              const existing = productsToPut[existingIdx]
+              // Only apply dbProducts images/variants if app_sync payload does not already have images/variants
+              if ((!existing.images || existing.images.length === 0) && dbImgs.length > 0) {
+                existing.images = dbImgs
+              }
+              if (!existing.image && dbImg) {
+                existing.image = dbImg
+              }
+              if ((!existing.variants || existing.variants.length === 0) && dbVars.length > 0) {
+                existing.variants = dbVars
+              }
+              if (!existing.name && dbP.name) existing.name = dbP.name
+              if (existing.price === undefined && dbP.price !== undefined) existing.price = Number(dbP.price) || 0
+              if (existing.purchasePrice === undefined && dbP.purchase_price !== undefined) existing.purchasePrice = Number(dbP.purchase_price) || 0
+              if (!existing.category && dbP.category) existing.category = dbP.category
+              if (existing.hidden === undefined && dbP.hidden !== undefined) existing.hidden = Boolean(dbP.hidden)
             } else {
               productsToPut.push({
                 id: dbP.id,
