@@ -34,6 +34,7 @@ import { supabase } from '../lib/supabase'
 
 let realtimeChannel = null
 let isPulling = false
+let lastPullTime = 0
 
 // Anti-tree-shaking deep clone to ensure Vue proxies are fully unwrapped
 function cloneDeep(obj) { if (obj === null || typeof obj !== 'object') return obj; if (Array.isArray(obj)) return obj.map(cloneDeep); const res = {}; for (const key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { res[key] = cloneDeep(obj[key]); } } return res; }
@@ -121,13 +122,14 @@ export const useShop = defineStore('shop', {
         })
       }
 
-      // Background auto-refresh timer to poll for new orders continuously (every 60s)
+      // Background auto-refresh timer to poll for new orders continuously (every 10s for zero cross-browser lag)
       if (typeof window !== 'undefined' && !window._alphashopPollInterval) {
         window._alphashopPollInterval = setInterval(() => {
           if (navigator.onLine) {
             this.pullFromSupabase().catch(() => {})
+            this.sync().catch(() => {})
           }
-        }, 60000)
+        }, 10000)
       }
 
       window.addEventListener('online', async () => {
@@ -621,8 +623,10 @@ export const useShop = defineStore('shop', {
     },
 
     async pullFromSupabase() {
-      if (!supabase || isPulling) return
+      const now = Date.now()
+      if (!supabase || (isPulling && now - lastPullTime < 12000)) return
       isPulling = true
+      lastPullTime = now
       try {
         // Fetch app_sync, products, and sales concurrently in parallel to minimize latency
         const [appSyncRes, dbProductsRes, dbSalesRes] = await Promise.allSettled([
@@ -809,6 +813,26 @@ export const useShop = defineStore('shop', {
             const idx = this.products.findIndex(x => x.id === dbP.id)
             if (idx < 0) this.products.push(updated)
             else this.products.splice(idx, 1, updated)
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, (change) => {
+            const dbS = change.new
+            if (!dbS || !dbS.id) return
+            if ((!dbS.number || dbS.number === '') && Number(dbS.total || 0) === 0) return
+            const updated = {
+              id: dbS.id,
+              number: dbS.number || '',
+              total: Number(dbS.total) || 0,
+              payment: dbS.payment_method || 'Espèces',
+              status: dbS.status || 'completed',
+              source: dbS.source || 'pos',
+              confirmed: true,
+              items: [],
+              createdAt: dbS.created_at || new Date().toISOString()
+            }
+            localDb.sales.put(updated)
+            const idx = this.sales.findIndex(x => x.id === dbS.id)
+            if (idx < 0) this.sales.unshift(updated)
+            else this.sales.splice(idx, 1, updated)
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'app_sync' }, (change) => {
             const record = change.new
