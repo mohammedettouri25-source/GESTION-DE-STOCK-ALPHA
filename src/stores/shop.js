@@ -33,6 +33,7 @@ import { supabase } from '../lib/supabase'
 })
 
 let realtimeChannel = null
+let isPulling = false
 
 // Anti-tree-shaking deep clone to ensure Vue proxies are fully unwrapped
 function cloneDeep(obj) { if (obj === null || typeof obj !== 'object') return obj; if (Array.isArray(obj)) return obj.map(cloneDeep); const res = {}; for (const key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { res[key] = cloneDeep(obj[key]); } } return res; }
@@ -120,13 +121,13 @@ export const useShop = defineStore('shop', {
         })
       }
 
-      // Background auto-refresh timer to poll for new orders continuously
+      // Background auto-refresh timer to poll for new orders continuously (every 60s)
       if (typeof window !== 'undefined' && !window._alphashopPollInterval) {
         window._alphashopPollInterval = setInterval(() => {
           if (navigator.onLine) {
             this.pullFromSupabase().catch(() => {})
           }
-        }, 15000)
+        }, 60000)
       }
 
       window.addEventListener('online', async () => {
@@ -620,10 +621,20 @@ export const useShop = defineStore('shop', {
     },
 
     async pullFromSupabase() {
-      if (!supabase) return
+      if (!supabase || isPulling) return
+      isPulling = true
       try {
-        const { data } = await supabase.from('app_sync').select('*')
-        
+        // Fetch app_sync, products, and sales concurrently in parallel to minimize latency
+        const [appSyncRes, dbProductsRes, dbSalesRes] = await Promise.allSettled([
+          supabase.from('app_sync').select('*'),
+          supabase.from('products').select('*'),
+          supabase.from('sales').select('*')
+        ])
+
+        const data = appSyncRes.status === 'fulfilled' && !appSyncRes.value.error ? appSyncRes.value.data : null
+        const dbProducts = dbProductsRes.status === 'fulfilled' && !dbProductsRes.value.error ? dbProductsRes.value.data : null
+        const dbSales = dbSalesRes.status === 'fulfilled' && !dbSalesRes.value.error ? dbSalesRes.value.data : null
+
         const productsToPut = []
         const salesToPut = []
         const customersToPut = []
@@ -677,8 +688,7 @@ export const useShop = defineStore('shop', {
           }
         }
 
-        // Always query normalized products table to merge latest prices, images & variants across devices
-        const { data: dbProducts } = await supabase.from('products').select('*')
+        // Merge normalized products table
         if (dbProducts && dbProducts.length > 0) {
           for (const dbP of dbProducts) {
             const dbImg = dbP.image || (Array.isArray(dbP.images) && dbP.images[0] ? dbP.images[0] : '')
@@ -713,11 +723,9 @@ export const useShop = defineStore('shop', {
           }
         }
 
-        // Always query normalized sales table as well to merge missing sales records
-        const { data: dbSales } = await supabase.from('sales').select('*')
+        // Merge normalized sales table
         if (dbSales && dbSales.length > 0) {
           for (const dbS of dbSales) {
-            // Ignore empty dummy 0 MAD sales with no number
             if ((!dbS.number || dbS.number === '') && Number(dbS.total || 0) === 0) continue
 
             const existingIdx = salesToPut.findIndex(s => s.id === dbS.id)
@@ -739,14 +747,14 @@ export const useShop = defineStore('shop', {
           }
         }
 
-        // Perform batch deletes
-        for (const id of deletedProductIds) await localDb.products.delete(id).catch(() => {})
-        for (const id of deletedSaleIds) await localDb.sales.delete(id).catch(() => {})
-        for (const id of deletedCustomerIds) await localDb.customers.delete(id).catch(() => {})
-        for (const id of deletedSupplierIds) await localDb.suppliers?.delete(id).catch(() => {})
-        for (const id of deletedExpenseIds) await localDb.expenses?.delete(id).catch(() => {})
+        // Perform fast batch deletes in Dexie (single transaction per table)
+        if (deletedProductIds.length) await localDb.products.bulkDelete(deletedProductIds).catch(() => {})
+        if (deletedSaleIds.length) await localDb.sales.bulkDelete(deletedSaleIds).catch(() => {})
+        if (deletedCustomerIds.length) await localDb.customers.bulkDelete(deletedCustomerIds).catch(() => {})
+        if (deletedSupplierIds.length && localDb.suppliers) await localDb.suppliers.bulkDelete(deletedSupplierIds).catch(() => {})
+        if (deletedExpenseIds.length && localDb.expenses) await localDb.expenses.bulkDelete(deletedExpenseIds).catch(() => {})
 
-        // Perform batch puts for fast, single-transaction IndexedDB updates
+        // Perform batch puts for fast single-transaction IndexedDB updates
         if (productsToPut.length) await localDb.products.bulkPut(productsToPut).catch(() => {})
         if (salesToPut.length) await localDb.sales.bulkPut(salesToPut).catch(() => {})
         if (customersToPut.length) await localDb.customers.bulkPut(customersToPut).catch(() => {})
@@ -762,6 +770,8 @@ export const useShop = defineStore('shop', {
         this.expenses = await localDb.expenses?.toArray().catch(() => []) || []
       } catch (err) {
         console.warn('pullFromSupabase failed:', err.message)
+      } finally {
+        isPulling = false
       }
     },
 
