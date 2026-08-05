@@ -92,6 +92,10 @@ export const useShop = defineStore('shop', {
       for (const p of localProds) {
         if (p.id && String(p.id).startsWith('b1000000-0000-4000-8000-')) {
           await localDb.products.delete(p.id).catch(() => {})
+          if (supabase) {
+            supabase.from('products').delete().eq('id', p.id).then(() => {}).catch(() => {})
+            supabase.from('app_sync').delete().eq('entity_id', p.id).then(() => {}).catch(() => {})
+          }
         } else {
           cleanProds.push(p)
         }
@@ -103,6 +107,10 @@ export const useShop = defineStore('shop', {
       for (const s of rawSales) {
         if (!s || !s.id || s.deleted || !s.createdAt || ((!s.number || s.number === '') && Number(s.total || 0) === 0 && !s.customer?.name && !s.customer?.phone)) {
           await localDb.sales.delete(s.id).catch(() => {})
+          if (supabase && s?.id) {
+            supabase.from('sales').delete().eq('id', s.id).then(() => {}).catch(() => {})
+            supabase.from('app_sync').delete().eq('entity_id', s.id).then(() => {}).catch(() => {})
+          }
         } else {
           validSales.push(s)
         }
@@ -667,16 +675,25 @@ export const useShop = defineStore('shop', {
             if (!payload) continue
 
             if (entity_type === 'products') {
-              if (payload.deleted) {
+              if (payload.deleted || (payload.id && String(payload.id).startsWith('b1000000-0000-4000-8000-'))) {
                 deletedProductIds.push(entity_id)
+                if (supabase && entity_id) {
+                  supabase.from('products').delete().eq('id', entity_id).then(() => {}).catch(() => {})
+                  supabase.from('app_sync').delete().eq('entity_id', entity_id).then(() => {}).catch(() => {})
+                }
               } else if (payload.id) {
                 if (!payload.images) payload.images = payload.image ? [payload.image] : []
                 if (!payload.image && payload.images.length) payload.image = payload.images[0]
                 productsToPut.push(payload)
               }
             } else if (entity_type === 'sales') {
-              if (payload.deleted || payload.deleted === true) {
+              const isDummy = (!payload.number || payload.number === '') && Number(payload.total || 0) === 0 && !payload.customer?.name && !payload.customer?.phone
+              if (payload.deleted || payload.deleted === true || isDummy) {
                 deletedSaleIds.push(entity_id)
+                if (supabase && entity_id) {
+                  supabase.from('sales').delete().eq('id', entity_id).then(() => {}).catch(() => {})
+                  supabase.from('app_sync').delete().eq('entity_id', entity_id).then(() => {}).catch(() => {})
+                }
               } else if (payload.id) {
                 salesToPut.push(payload)
               }
@@ -705,6 +722,10 @@ export const useShop = defineStore('shop', {
         // Merge normalized products table safely without overwriting updated images/payloads from app_sync
         if (dbProducts && dbProducts.length > 0) {
           for (const dbP of dbProducts) {
+            if (dbP.id && String(dbP.id).startsWith('b1000000-0000-4000-8000-')) {
+              if (supabase) supabase.from('products').delete().eq('id', dbP.id).then(() => {}).catch(() => {})
+              continue
+            }
             const dbImg = dbP.image || (Array.isArray(dbP.images) && dbP.images[0] ? dbP.images[0] : '')
             const dbImgs = Array.isArray(dbP.images) && dbP.images.length > 0 ? dbP.images : (dbImg ? [dbImg] : [])
             const dbVars = Array.isArray(dbP.variants) ? dbP.variants : []
@@ -748,7 +769,10 @@ export const useShop = defineStore('shop', {
         // Merge normalized sales table
         if (dbSales && dbSales.length > 0) {
           for (const dbS of dbSales) {
-            if ((!dbS.number || dbS.number === '') && Number(dbS.total || 0) === 0) continue
+            if (!dbS || !dbS.id || ((!dbS.number || dbS.number === '') && Number(dbS.total || 0) === 0 && !dbS.customer_id)) {
+              if (supabase && dbS?.id) supabase.from('sales').delete().eq('id', dbS.id).then(() => {}).catch(() => {})
+              continue
+            }
 
             const existingIdx = salesToPut.findIndex(s => s.id === dbS.id)
             if (existingIdx >= 0) {
