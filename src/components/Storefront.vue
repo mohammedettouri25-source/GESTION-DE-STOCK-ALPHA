@@ -106,6 +106,13 @@ const selectedCategory = ref('Tous')
 const selectedSize = ref('Tous')
 const maxPriceLimit = ref(1000)
 const sidebarOpen = ref(false)
+const mobileSearchExpanded = ref(false)
+
+function onSearchFocus() {
+  if (typeof window !== 'undefined' && window.innerWidth <= 640) {
+    mobileSearchExpanded.value = true
+  }
+}
 
 function getCategoryCount(catId) {
   if (!shop.products) return 0
@@ -772,14 +779,15 @@ function getProductImagesList(product) {
         </div>
 
         <!-- Search Bar -->
-        <div class="nav-search">
+        <div class="nav-search" @click="onSearchFocus">
           <Search :size="14" class="search-icon" />
           <input 
             v-model="searchQuery"
             type="text" 
-            :placeholder="currentLang === 'ar' ? 'ابحث عن الملابس، القمصان، الشورتات...' : 'Rechercher vêtements, chemises, cargous...'" 
+            @focus="onSearchFocus"
+            :placeholder="currentLang === 'ar' ? 'ابحث هنا...' : 'Rechercher...'" 
           />
-          <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search">
+          <button v-if="searchQuery" @click.stop="searchQuery = ''" class="clear-search">
             <X :size="12" />
           </button>
         </div>
@@ -823,6 +831,37 @@ function getProductImagesList(product) {
         </div>
       </div>
     </header>
+
+    <!-- MOBILE EXPANDABLE SEARCH OVERLAY (SLIDES DOWN UNDER HEADER ON PHONE) -->
+    <div v-if="mobileSearchExpanded" class="mobile-search-overlay" :class="{ rtl: currentLang === 'ar' }">
+      <div class="mobile-search-container">
+        <div class="mobile-search-input-box">
+          <Search :size="16" class="search-icon" />
+          <input 
+            v-model="searchQuery"
+            type="text" 
+            :placeholder="currentLang === 'ar' ? 'اكتب هنا للبحث عن الملابس، القمصان...' : 'Tapez ici pour rechercher un produit...'" 
+            class="mobile-search-input"
+            autofocus
+          />
+          <button v-if="searchQuery" @click="searchQuery = ''" class="clear-btn">
+            <X :size="14" />
+          </button>
+        </div>
+
+        <button @click="mobileSearchExpanded = false" class="cancel-search-btn">
+          {{ currentLang === 'ar' ? 'إغلاق' : 'Fermer' }}
+        </button>
+      </div>
+
+      <!-- Live Search Results Badge -->
+      <div v-if="searchQuery.trim()" class="mobile-search-live-results">
+        <span>{{ currentLang === 'ar' ? `نتائج البحث (${filteredProducts.length})` : `Résultats trouvés (${filteredProducts.length})` }}</span>
+        <button @click="mobileSearchExpanded = false" class="view-results-btn">
+          {{ currentLang === 'ar' ? 'عرض المنتجات ↓' : 'Voir les produits ↓' }}
+        </button>
+      </div>
+    </div>
 
     <!-- PAGE 1: HOME CATALOGUE VIEW -->
     <div v-if="currentPage === 'home'">
@@ -1563,6 +1602,119 @@ function getProductImagesList(product) {
   color: #0071e3;
 }
 
+/* Mobile Expandable Search Bar Overlay */
+.mobile-search-overlay {
+  position: sticky;
+  top: 60px;
+  left: 0;
+  right: 0;
+  width: 100%;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e5e7;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  padding: 12px 16px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.mobile-search-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-search-input-box {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.mobile-search-input-box .search-icon {
+  position: absolute;
+  left: 14px;
+  color: #2563eb;
+}
+
+.mobile-search-overlay.rtl .mobile-search-input-box .search-icon {
+  left: auto;
+  right: 14px;
+}
+
+.mobile-search-input {
+  width: 100%;
+  background-color: #f1f5f9;
+  border: 2px solid #2563eb;
+  border-radius: 16px;
+  padding: 10px 38px 10px 38px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  outline: none;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.15);
+}
+
+.mobile-search-input-box .clear-btn {
+  position: absolute;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.08);
+  border: none;
+  color: #64748b;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.mobile-search-overlay.rtl .mobile-search-input-box .clear-btn {
+  right: auto;
+  left: 12px;
+}
+
+.cancel-search-btn {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mobile-search-live-results {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.view-results-btn {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
 /* Nav Search */
 .nav-search {
   position: relative;
@@ -1570,6 +1722,7 @@ function getProductImagesList(product) {
   max-width: 400px;
   display: flex;
   align-items: center;
+  cursor: pointer;
 }
 .nav-search input {
   width: 100%;
