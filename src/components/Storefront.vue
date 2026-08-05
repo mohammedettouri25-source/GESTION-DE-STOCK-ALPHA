@@ -105,6 +105,13 @@ const searchQuery = ref('')
 const selectedCategory = ref('Tous')
 const selectedSize = ref('Tous')
 const maxPriceLimit = ref(1000)
+const sidebarOpen = ref(false)
+
+function getCategoryCount(catId) {
+  if (!shop.products) return 0
+  if (catId === 'Tous') return shop.products.filter(p => !p.hidden).length
+  return shop.products.filter(p => !p.hidden && p.category === catId).length
+}
 
 // Cart & Order State
 const cartOpen = ref(false)
@@ -174,25 +181,25 @@ const orderForm = ref({
 const categories = computed(() => {
   if (currentLang.value === 'ar') {
     return [
-      { id: 'Tous', name: 'جميع المنتجات', icon: '🔥' },
-      { id: 'Chemises', name: 'قمصان', icon: '👔' },
-      { id: 'Ensembles', name: 'أطقم ملابس', icon: '👕' },
-      { id: 'T-Shirts & Polos', name: 'تيشيرتات وبولو', icon: '👕' },
-      { id: 'Shorts', name: 'شورتات وبرمودا', icon: '🩳' },
-      { id: 'Pantalons & Cargos', name: 'سراويل وكارغو', icon: '👖' },
-      { id: 'Jackets & Hoodies', name: 'جاكيتات وهوديز', icon: '🧥' },
-      { id: 'Accessoires', name: 'إكسسوارات', icon: '🧢' }
+      { id: 'Tous', name: '🔥 جميع المنتجات (TOUS LES PRODUITS)', icon: '🔥' },
+      { id: 'Chemises', name: '👔 قمصان (CHEMISES)', icon: '👔' },
+      { id: 'Ensembles', name: '👕 أطقم ملابس (ENSEMBLES)', icon: '👕' },
+      { id: 'T-Shirts & Polos', name: '👕 تيشيرتات وبولو (T-SHIRTS & POLOS)', icon: '👕' },
+      { id: 'Shorts', name: '🩳 شورتات وبرمودا (SHORTS & BERMUDAS)', icon: '🩳' },
+      { id: 'Pantalons & Cargos', name: '👖 سراويل وكارغو (PANTALONS & CARGOS)', icon: '👖' },
+      { id: 'Jackets & Hoodies', name: '🧥 جاكيتات وهوديز (JACKETS & HOODIES)', icon: '🧥' },
+      { id: 'Accessoires', name: '🧢 إكسسوارات (ACCESSOIRES)', icon: '🧢' }
     ]
   }
   return [
-    { id: 'Tous', name: 'Tous les produits', icon: '🔥' },
-    { id: 'Chemises', name: 'Chemises', icon: '👔' },
-    { id: 'Ensembles', name: 'Ensembles', icon: '👕' },
-    { id: 'T-Shirts & Polos', name: 'T-Shirts & Polos', icon: '👕' },
-    { id: 'Shorts', name: 'Shorts & Bermudas', icon: '🩳' },
-    { id: 'Pantalons & Cargos', name: 'Pantalons & Cargos', icon: '👖' },
-    { id: 'Jackets & Hoodies', name: 'Jackets & Hoodies', icon: '🧥' },
-    { id: 'Accessoires', name: 'Accessoires', icon: '🧢' }
+    { id: 'Tous', name: 'TOUS LES PRODUITS', icon: '🔥' },
+    { id: 'Chemises', name: 'CHEMISES', icon: '👔' },
+    { id: 'Ensembles', name: 'ENSEMBLES', icon: '👕' },
+    { id: 'T-Shirts & Polos', name: 'T-SHIRTS & POLOS', icon: '👕' },
+    { id: 'Shorts', name: 'SHORTS & BERMUDAS', icon: '🩳' },
+    { id: 'Pantalons & Cargos', name: 'PANTALONS & CARGOS', icon: '👖' },
+    { id: 'Jackets & Hoodies', name: 'JACKETS & HOODIES', icon: '🧥' },
+    { id: 'Accessoires', name: 'ACCESSOIRES', icon: '🧢' }
   ]
 })
 
@@ -780,6 +787,17 @@ function getProductImagesList(product) {
         <!-- Right: Actions Buttons -->
         <div class="nav-actions">
           
+          <!-- Sidebar Menu Trigger Button -->
+          <button 
+            @click="sidebarOpen = true"
+            class="nav-sidebar-trigger-btn"
+            :title="currentLang === 'ar' ? 'القائمة والتصنيفات' : 'Catégories & Filtres'"
+          >
+            <SlidersHorizontal :size="16" />
+            <span>{{ currentLang === 'ar' ? 'التصنيفات' : 'CATÉGORIES' }}</span>
+            <span v-if="selectedCategory !== 'Tous' || selectedSize !== 'Tous'" class="nav-active-dot"></span>
+          </button>
+
           <!-- Language Switcher Button -->
           <button 
             @click="toggleLang"
@@ -864,46 +882,16 @@ function getProductImagesList(product) {
 
       <!-- APPLE-STYLE TOP HORIZONTAL CATEGORY & FILTER BAR -->
       <div class="store-layout-container">
-        <nav class="top-filter-bar">
-        <div class="filter-controls-row">
-          
-          <!-- Category Selector Dropdown -->
-          <div class="select-wrapper">
-            <label>{{ currentLang === 'ar' ? 'التصنيف:' : 'Catégorie:' }}</label>
-            <select v-model="selectedCategory" class="cat-select-inline">
-              <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-                {{ cat.icon }} {{ cat.name }}
-              </option>
-            </select>
-          </div>
-
-          <!-- Size Filter Chips -->
-          <div class="size-filter-inline">
-            <label>{{ currentLang === 'ar' ? 'المقاس:' : 'Taille:' }}</label>
-            <div class="size-chips-wrapper">
-              <button 
-                v-for="sz in availableSizes"
-                :key="sz"
-                @click="selectedSize = sz"
-                :class="['size-pill', selectedSize === sz ? 'active' : '']"
-              >
-                {{ sz === 'Tous' ? (currentLang === 'ar' ? 'الكل' : 'Tous') : sz }}
-              </button>
-            </div>
-          </div>
-
-          <!-- Reset Filters Button -->
+        
+        <!-- Horizontal Category Pills Scrollbar with Menu Trigger -->
+        <div class="horizontal-pills-bar margin-bottom-md">
           <button 
-            v-if="selectedCategory !== 'Tous' || selectedSize !== 'Tous' || maxPriceLimit < 1000"
-            @click="selectedCategory = 'Tous'; selectedSize = 'Tous'; maxPriceLimit = 1000"
-            class="reset-btn-inline"
+            @click="sidebarOpen = true"
+            class="cat-pill-btn open-sidebar-pill-btn"
           >
-            {{ currentLang === 'ar' ? 'إعادة ضبط' : 'Réinitialiser' }}
+            <SlidersHorizontal :size="15" />
+            <span>{{ currentLang === 'ar' ? 'جميع التصنيفات' : 'MENU CATÉGORIES' }}</span>
           </button>
-        </div>
-
-        <!-- Horizontal Category Pills Scrollbar -->
-        <div class="horizontal-pills-bar">
           <button 
             v-for="cat in categories" 
             :key="cat.id"
@@ -911,17 +899,23 @@ function getProductImagesList(product) {
             :class="['cat-pill-btn', selectedCategory === cat.id ? 'active' : '']"
           >
             <span>{{ cat.icon }}</span>
-            <span>{{ cat.name }}</span>
+            <span>{{ cat.name.toUpperCase() }}</span>
           </button>
         </div>
-      </nav>
 
       <!-- PRODUCTS CATALOGUE GRID (100% Full Width, Clean & Unobstructed) -->
       <main class="fullwidth-products-main">
         
         <div class="catalogue-header-info">
-          <h2>{{ selectedCategory !== 'Tous' ? selectedCategory : (currentLang === 'ar' ? 'جميع الملابس والتشكيلات' : 'Tous les vêtements') }}</h2>
-          <span class="count-badge">{{ filteredProducts.length }} {{ currentLang === 'ar' ? 'منتج' : 'produits' }}</span>
+          <div class="header-menu-row">
+            <button @click="sidebarOpen = true" class="open-sidebar-menu-btn">
+              <SlidersHorizontal :size="16" />
+              <span>{{ currentLang === 'ar' ? 'التصنيفات والفلاتر' : 'CATÉGORIES & FILTRES' }}</span>
+              <span v-if="selectedCategory !== 'Tous' || selectedSize !== 'Tous'" class="active-dot-badge"></span>
+            </button>
+            <h2>{{ (selectedCategory !== 'Tous' ? selectedCategory : (currentLang === 'ar' ? 'جميع الملابس والتشكيلات' : 'TOUS LES PRODUITS')).toUpperCase() }}</h2>
+          </div>
+          <span class="count-badge">{{ filteredProducts.length }} {{ currentLang === 'ar' ? 'منتج' : 'PRODUITS' }}</span>
         </div>
 
         <!-- Products Cards Grid (2 cols mobile, 3 tablet, 4 desktop) -->
@@ -1348,6 +1342,83 @@ function getProductImagesList(product) {
         </div>
       </div>
     </div>
+
+    <!-- SIDEBAR CATEGORIES & FILTERS DRAWER -->
+    <Teleport to="body">
+      <div v-if="sidebarOpen" class="sidebar-backdrop" :class="{ rtl: currentLang === 'ar' }" @click.self="sidebarOpen = false">
+        <aside class="sidebar-drawer">
+          
+          <!-- Drawer Header -->
+          <div class="drawer-header">
+            <div class="header-title-box">
+              <span class="drawer-badge">🔥 {{ currentLang === 'ar' ? 'القائمة والتصنيفات' : 'MENU & CATÉGORIES' }}</span>
+              <h3>{{ currentLang === 'ar' ? 'التصنيفات والمقاسات' : 'CATÉGORIES & FILTRES' }}</h3>
+            </div>
+            <button @click="sidebarOpen = false" class="close-drawer-btn" title="Close">
+              <X :size="18" />
+            </button>
+          </div>
+
+          <!-- Drawer Body -->
+          <div class="drawer-body">
+
+            <!-- CATEGORIES SECTION -->
+            <div class="filter-group">
+              <div class="sidebar-group-title">
+                <span>🏷️ {{ currentLang === 'ar' ? 'اختر التصنيف' : 'CATÉGORIES' }}</span>
+              </div>
+              
+              <div class="category-menu-list">
+                <button 
+                  v-for="cat in categories" 
+                  :key="cat.id"
+                  @click="selectedCategory = cat.id; sidebarOpen = false"
+                  :class="['cat-menu-item', selectedCategory === cat.id ? 'active' : '']"
+                >
+                  <div class="cat-left">
+                    <span class="cat-icon">{{ cat.icon }}</span>
+                    <span class="cat-name">{{ cat.name.toUpperCase() }}</span>
+                  </div>
+                  <span class="cat-count-pill" v-if="getCategoryCount(cat.id) > 0">
+                    {{ getCategoryCount(cat.id) }}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <!-- SIZES SECTION -->
+            <div class="filter-group">
+              <div class="sidebar-group-title">
+                <span>📏 {{ currentLang === 'ar' ? 'اختر المقاس' : 'TAILLE (SIZE)' }}</span>
+              </div>
+              
+              <div class="sidebar-size-grid">
+                <button 
+                  v-for="sz in availableSizes"
+                  :key="sz"
+                  @click="selectedSize = sz; sidebarOpen = false"
+                  :class="['sidebar-size-btn', selectedSize === sz ? 'active' : '']"
+                >
+                  {{ sz === 'Tous' ? (currentLang === 'ar' ? 'الكل (TOUS)' : 'TOUS') : sz }}
+                </button>
+              </div>
+            </div>
+
+            <!-- RESET FILTERS -->
+            <div class="drawer-footer" v-if="selectedCategory !== 'Tous' || selectedSize !== 'Tous'">
+              <button 
+                @click="selectedCategory = 'Tous'; selectedSize = 'Tous'; sidebarOpen = false"
+                class="sidebar-reset-btn"
+              >
+                🔄 {{ currentLang === 'ar' ? 'إعادة ضبط الفلاتر' : 'RÉINITIALISER TOUS LES FILTRES' }}
+              </button>
+            </div>
+
+          </div>
+
+        </aside>
+      </div>
+    </Teleport>
 
     <!-- APPLE-STYLE MINIMALIST DARK BLACK STOREFRONT FOOTER -->
     <footer class="store-footer-dark">
@@ -2350,6 +2421,318 @@ function getProductImagesList(product) {
 .spec-row .icon {
   color: #0071e3;
   shrink: 0;
+}
+
+/* Header Menu Row & Floating Buttons */
+.header-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.open-sidebar-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: 20px;
+  border: none;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.open-sidebar-menu-btn:hover {
+  background: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.25);
+}
+
+.open-sidebar-pill-btn {
+  background: #0f172a !important;
+  color: #ffffff !important;
+  border-color: #0f172a !important;
+  font-weight: 800 !important;
+}
+
+.open-sidebar-pill-btn:hover {
+  background: #2563eb !important;
+  border-color: #2563eb !important;
+}
+
+.nav-sidebar-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+  padding: 8px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.nav-sidebar-trigger-btn:hover {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.nav-active-dot, .active-dot-badge {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  display: inline-block;
+}
+
+/* Sidebar Drawer Overlay & Modal */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 99999;
+  display: flex;
+  justify-content: flex-start;
+  animation: fadeIn 0.25s ease forwards;
+}
+
+.sidebar-backdrop.rtl {
+  justify-content: flex-end;
+}
+
+.sidebar-drawer {
+  width: 100%;
+  max-width: 360px;
+  height: 100%;
+  background: #ffffff;
+  box-shadow: 10px 0 40px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  animation: slideRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  overflow: hidden;
+}
+
+.sidebar-backdrop.rtl .sidebar-drawer {
+  animation: slideLeft 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideRight {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.drawer-header {
+  padding: 20px 22px;
+  border-bottom: 1px solid #e5e5e7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #ffffff;
+}
+
+.drawer-header .header-title-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawer-header .drawer-badge {
+  font-size: 10px;
+  font-weight: 800;
+  color: #60a5fa;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.drawer-header h3 {
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.close-drawer-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #ffffff;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.close-drawer-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+}
+
+.drawer-body {
+  padding: 22px;
+  flex-grow: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sidebar-group-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.category-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cat-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid #f1f5f9;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px;
+}
+
+.cat-menu-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  transform: translateX(3px);
+}
+
+.cat-menu-item.active {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+}
+
+.cat-menu-item .cat-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cat-menu-item .cat-icon {
+  font-size: 18px;
+}
+
+.cat-menu-item .cat-name {
+  font-weight: 700;
+  text-transform: uppercase !important;
+}
+
+.cat-count-pill {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  color: #64748b;
+}
+
+.cat-menu-item.active .cat-count-pill {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.sidebar-size-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.sidebar-size-btn {
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  text-transform: uppercase !important;
+  transition: all 0.2s ease;
+}
+
+.sidebar-size-btn:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.sidebar-size-btn.active {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+}
+
+.drawer-footer {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.sidebar-reset-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  text-transform: uppercase !important;
+  transition: all 0.2s ease;
+}
+
+.sidebar-reset-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
 }
 
 /* Related Products Styling */
