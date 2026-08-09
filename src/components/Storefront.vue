@@ -104,7 +104,24 @@ const activeImageIndex = ref(0)
 const searchQuery = ref('')
 const selectedCategory = ref('Tous')
 const selectedSize = ref('Tous')
-const maxPriceLimit = ref(1000)
+const maxPriceLimit = ref(3000)
+const showMobileFilters = ref(false)
+const selectedFilterColor = ref('Tous')
+
+const availableFilterColors = computed(() => {
+  const colors = new Set()
+  if (shop.products) {
+    shop.products.forEach(p => {
+      if (!p.hidden && p.variants) {
+        p.variants.forEach(v => {
+          if (v.color && v.stock > 0) colors.add(v.color.trim())
+          if (v.presetColor && v.presetColor !== 'Autre' && v.stock > 0) colors.add(v.presetColor.trim())
+        })
+      }
+    })
+  }
+  return ['Tous', ...Array.from(colors).sort()]
+})
 const sidebarOpen = ref(false)
 const mobileSearchExpanded = ref(false)
 
@@ -254,10 +271,17 @@ const filteredProducts = computed(() => {
     const matchSize = selectedSize.value === 'Tous' || 
                       (p.variants || []).some(v => v.size === selectedSize.value && v.stock > 0)
 
+    // Color match
+    const matchColor = selectedFilterColor.value === 'Tous' ||
+                       (p.variants || []).some(v => 
+                         ((v.color || '').trim() === selectedFilterColor.value || 
+                          (v.presetColor || '').trim() === selectedFilterColor.value) && v.stock > 0
+                       )
+
     // Price match
     const matchPrice = Number(p.price || 0) <= maxPriceLimit.value
 
-    return matchCat && matchSearch && matchSize && matchPrice
+    return matchCat && matchSearch && matchSize && matchColor && matchPrice
   })
 })
 
@@ -795,15 +819,14 @@ function getProductImagesList(product) {
         <!-- Right: Actions Buttons -->
         <div class="nav-actions">
           
-          <!-- Sidebar Menu Trigger Button in Navbar Header -->
+          <!-- Simple Catalog Link in Navbar Header -->
           <button 
-            @click="sidebarOpen = true"
+            @click="currentPage = 'catalog'; sidebarOpen = false; maxPriceLimit = 3000; selectedCategory = 'Tous'; selectedSize = 'Tous'; selectedFilterColor = 'Tous';"
             class="nav-sidebar-trigger-btn"
-            :title="currentLang === 'ar' ? 'القائمة والتصنيفات' : 'Catégories & Filtres'"
+            :title="currentLang === 'ar' ? 'المنتجات' : 'Catalogue'"
           >
-            <SlidersHorizontal :size="16" />
-            <span>{{ currentLang === 'ar' ? 'التصنيفات والفلاتر' : 'CATÉGORIES & FILTRES' }}</span>
-            <span v-if="selectedCategory !== 'Tous' || selectedSize !== 'Tous'" class="nav-active-dot"></span>
+            <ShoppingBag :size="16" />
+            <span>{{ currentLang === 'ar' ? 'جميع المنتجات' : 'LES PRODUITS' }}</span>
           </button>
 
           <!-- Language Switcher Button -->
@@ -863,113 +886,160 @@ function getProductImagesList(product) {
       </div>
     </div>
 
-    <!-- PAGE 1: HOME CATALOGUE VIEW -->
-    <div v-if="currentPage === 'home'">
-      
-      <!-- FULL-WIDTH VIDEO HERO BANNER -->
-      <section class="store-hero-video-full">
-        <!-- Video Background -->
-        <video 
-          class="hero-video-bg" 
-          autoplay 
-          loop 
-          muted 
-          playsinline
-        >
+    <!-- PAGE 1: HOME VIEW -->
+    <div v-if="currentPage === 'home'" class="landing-page-view">
+      <section class="store-hero-video-full landing-hero">
+        <video class="hero-video-bg" autoplay loop muted playsinline>
           <source src="/IMG_5111.MP4" type="video/mp4" />
         </video>
-        
-        <!-- Dark Overlay for better text readability -->
         <div class="hero-dark-overlay"></div>
-        
-        <!-- Animated Text Content -->
         <div class="hero-video-content">
-          <h1 class="video-title animated-text">
+          <h1 class="video-title animated-text gradient-hover">
             {{ currentLang === 'ar' ? 'اكتشف أحدث تشكيلاتنا' : 'DÉCOUVREZ NOTRE NOUVELLE COLLECTION' }}
           </h1>
           <p class="video-subtitle animated-text-delay">
             {{ currentLang === 'ar' ? 'أناقة لا مثيل لها لكل يوم' : 'L\'élégance au quotidien, sans compromis' }}
           </p>
+          <button @click="currentPage = 'catalog'" class="hero-shop-btn animated-btn">
+            {{ currentLang === 'ar' ? 'تسوق الآن' : 'SHOPPER MAINTENANT' }}
+          </button>
         </div>
       </section>
 
-      <!-- APPLE-STYLE TOP HORIZONTAL CATEGORY & FILTER BAR -->
-      <div class="store-layout-container">
-        
-        <!-- Horizontal Category Pills Scrollbar -->
-        <div class="horizontal-pills-bar margin-bottom-md">
-          <button 
-            v-for="cat in categories" 
-            :key="cat.id"
-            @click="selectedCategory = cat.id"
-            :class="['cat-pill-btn', selectedCategory === cat.id ? 'active' : '']"
-          >
-            <span>{{ cat.icon }}</span>
-            <span>{{ cat.name.toUpperCase() }}</span>
-          </button>
-        </div>
-
-      <!-- PRODUCTS CATALOGUE GRID (100% Full Width, Clean & Unobstructed) -->
-      <main class="fullwidth-products-main">
-        
-        <div class="catalogue-header-info">
-          <h2>{{ (selectedCategory !== 'Tous' ? selectedCategory : (currentLang === 'ar' ? 'جميع الملابس والتشكيلات' : 'TOUS LES PRODUITS')).toUpperCase() }}</h2>
-          <span class="count-badge">{{ filteredProducts.length }} {{ currentLang === 'ar' ? 'منتج' : 'PRODUITS' }}</span>
-        </div>
-
-        <!-- Products Cards Grid (2 cols mobile, 3 tablet, 4 desktop) -->
-        <div v-if="filteredProducts.length > 0" class="products-grid-full">
+      <section class="featured-section" style="max-width: 1400px; margin: 40px auto; padding: 0 20px;">
+        <h2 style="font-size: 24px; font-weight: 800; text-transform: uppercase; margin-bottom: 24px;">{{ currentLang === 'ar' ? 'وصل حديثاً' : 'NOUVEAUTÉS' }}</h2>
+        <div class="products-grid-full">
           <div 
-            v-for="product in filteredProducts" 
+            v-for="product in filteredProducts.slice(0, 4)" 
             :key="product.id"
             @click="openProductDetail(product)"
             class="product-card-modern"
           >
             <div>
-              <!-- Image Box -->
               <div class="image-wrapper">
-                <img 
-                  :src="getProductImage(product)" 
-                  :alt="product.name"
-                  loading="lazy"
-                />
-                <span class="category-badge font-bold">
-                  {{ product.category || 'Vêtement' }}
-                </span>
+                <img :src="getProductImage(product)" :alt="product.name" loading="lazy"/>
+                <span class="category-badge font-bold">{{ product.category || 'Vêtement' }}</span>
               </div>
-
-              <!-- Product Info -->
               <div class="details-body">
-                <h3 class="product-title">
-                  {{ product.name }}
-                </h3>
-                <div class="price-tag">
-                  {{ product.price }} <small>DH</small>
-                </div>
+                <h3 class="product-title">{{ product.name }}</h3>
+                <div class="price-tag">{{ product.price }} <small>DH</small></div>
               </div>
             </div>
-
-            <!-- Action Button -->
             <div class="card-action-box">
-              <button 
-                @click.stop="openProductDetail(product)"
-                class="action-btn"
-              >
-                {{ currentLang === 'ar' ? 'طلب سريع / معاينة' : 'Découvrir' }}
-              </button>
+              <button @click.stop="openProductDetail(product)" class="action-btn">{{ currentLang === 'ar' ? 'طلب سريع / معاينة' : 'Découvrir' }}</button>
             </div>
           </div>
         </div>
-
-        <!-- Empty State -->
-        <div v-else class="empty-catalogue-box">
-          <Search :size="36" class="empty-icon" />
-          <h3>{{ currentLang === 'ar' ? 'لم يتم العثور على أي منتج' : 'Aucun produit trouvé' }}</h3>
-          <p>{{ currentLang === 'ar' ? 'جرب تغيير التصنيف أو فلاتر البحث.' : 'Essayez de changer la catégorie أو les filtres.' }}</p>
-        </div>
-      </main>
-      </div> <!-- End of store-layout-container -->
+      </section>
     </div>
+
+    <!-- PAGE 2: CATALOG VIEW (ADIDAS STYLE) -->
+    <div v-if="currentPage === 'catalog'" class="catalog-page-container">
+      <div class="catalog-top-bar">
+        <h2>{{ (selectedCategory !== 'Tous' ? selectedCategory : (currentLang === 'ar' ? 'جميع المنتجات' : 'TOUS LES PRODUITS')).toUpperCase() }}</h2>
+        <span class="count-badge">[{{ filteredProducts.length }}]</span>
+      </div>
+
+      <div class="catalog-layout">
+        
+        <!-- Mobile Filter Toggle Button -->
+        <div class="mobile-filter-header mobile-only">
+          <button @click="showMobileFilters = true" class="mobile-filter-btn">
+            <Filter :size="16" />
+            <span>{{ currentLang === 'ar' ? 'تصفية المنتجات' : 'FILTRER LES PRODUITS' }}</span>
+          </button>
+        </div>
+
+        <!-- Filter Sidebar -->
+        <div class="catalog-sidebar" :class="{ 'mobile-open': showMobileFilters }">
+          <div class="mobile-filter-close mobile-only">
+            <h3>{{ currentLang === 'ar' ? 'تصفية حسب' : 'FILTRER PAR' }}</h3>
+            <button @click="showMobileFilters = false"><X :size="24"/></button>
+          </div>
+
+          <div class="sidebar-header">
+            <h3>{{ currentLang === 'ar' ? 'تصفية حسب' : 'FILTRER PAR' }}</h3>
+          </div>
+
+          <div class="filter-section">
+            <h4 class="filter-title">{{ currentLang === 'ar' ? 'الفئة' : 'CATÉGORIE' }}</h4>
+            <div class="filter-options-list">
+              <label v-for="cat in categories" :key="cat.id" class="filter-checkbox-label">
+                <input type="radio" :value="cat.id" v-model="selectedCategory" @change="showMobileFilters = false" name="category_filter" />
+                <span>{{ cat.name }}</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="filter-section">
+            <h4 class="filter-title">{{ currentLang === 'ar' ? 'المقاس' : 'TAILLE' }}</h4>
+            <div class="filter-grid">
+              <button 
+                v-for="sz in availableSizes" :key="sz"
+                @click="selectedSize = sz; showMobileFilters = false"
+                :class="['filter-grid-btn', selectedSize === sz ? 'active' : '']"
+              >
+                {{ sz === 'Tous' ? (currentLang === 'ar' ? 'الكل' : 'TOUS') : sz }}
+              </button>
+            </div>
+          </div>
+
+          <div class="filter-section">
+            <h4 class="filter-title">{{ currentLang === 'ar' ? 'اللون' : 'COULEUR' }}</h4>
+            <div class="filter-grid">
+              <button 
+                v-for="c in availableFilterColors" :key="c"
+                @click="selectedFilterColor = c; showMobileFilters = false"
+                :class="['filter-grid-btn color-btn', selectedFilterColor === c ? 'active' : '']"
+              >
+                {{ c === 'Tous' ? (currentLang === 'ar' ? 'الكل' : 'TOUS') : c }}
+              </button>
+            </div>
+          </div>
+
+          <div class="filter-section">
+            <h4 class="filter-title" style="display:flex; justify-content:space-between;">
+              <span>{{ currentLang === 'ar' ? 'السعر' : 'PRIX' }}</span>
+              <span class="budget-badge">{{ maxPriceLimit }} DH</span>
+            </h4>
+            <input type="range" v-model.number="maxPriceLimit" min="0" max="5000" step="50" class="budget-slider" />
+          </div>
+          
+          <button @click="selectedCategory = 'Tous'; selectedSize = 'Tous'; selectedFilterColor = 'Tous'; maxPriceLimit = 3000" class="reset-filters-btn">
+            {{ currentLang === 'ar' ? 'مسح الفلاتر' : 'EFFACER TOUT' }}
+          </button>
+        </div>
+
+        <main class="catalog-main">
+          <div v-if="filteredProducts.length > 0" class="products-grid-full">
+            <div 
+              v-for="product in filteredProducts" 
+              :key="product.id"
+              @click="openProductDetail(product)"
+              class="product-card-modern"
+            >
+              <div>
+                <div class="image-wrapper">
+                  <img :src="getProductImage(product)" :alt="product.name" loading="lazy"/>
+                  <span class="category-badge font-bold">{{ product.category || 'Vêtement' }}</span>
+                </div>
+                <div class="details-body">
+                  <h3 class="product-title">{{ product.name }}</h3>
+                  <div class="price-tag">{{ product.price }} <small>DH</small></div>
+                </div>
+              </div>
+              <div class="card-action-box">
+                <button @click.stop="openProductDetail(product)" class="action-btn">{{ currentLang === 'ar' ? 'طلب سريع / معاينة' : 'Découvrir' }}</button>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-catalogue-box">
+            <h3>{{ currentLang === 'ar' ? 'لم يتم العثور على أي منتج' : 'Aucun produit trouvé' }}</h3>
+          </div>
+        </main>
+      </div> <!-- End catalog-layout -->
+    </div> <!-- End PAGE 2 -->
+    
 
 
     <!-- PAGE 2: DEDICATED SINGLE PRODUCT DETAIL VIEW (Apple Store Layout) -->
@@ -3769,4 +3839,226 @@ function getProductImagesList(product) {
     transform: translateY(0);
   }
 }
+
+/* HERO ANIMATIONS */
+.gradient-hover {
+  background: linear-gradient(90deg, #ffffff, #ffffff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 200% 100%;
+  transition: all 0.4s ease;
+}
+.gradient-hover:hover {
+  background: linear-gradient(90deg, #38bdf8, #818cf8, #e879f9, #38bdf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradientFlow 3s linear infinite;
+  transform: scale(1.02);
+}
+@keyframes gradientFlow { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+.hero-shop-btn {
+  margin-top: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  padding: 14px 32px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.3s;
+}
+.hero-shop-btn:hover {
+  background: #ffffff;
+  color: #000;
+  transform: scale(1.05);
+}
+
+/* CATALOG LAYOUT */
+.catalog-page-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.catalog-top-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.catalog-top-bar h2 {
+  font-size: 28px;
+  font-weight: 800;
+  font-style: italic;
+  text-transform: uppercase;
+}
+.catalog-layout {
+  display: flex;
+  gap: 40px;
+  align-items: flex-start;
+}
+.catalog-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 100px;
+}
+.sidebar-header h3 {
+  font-size: 18px;
+  font-weight: 800;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+  border-bottom: 2px solid #000;
+  padding-bottom: 12px;
+  display: inline-block;
+}
+.filter-section {
+  margin-bottom: 32px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 24px;
+}
+.filter-title {
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.filter-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.filter-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.filter-checkbox-label input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #000;
+  cursor: pointer;
+}
+.filter-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.filter-grid-btn {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.filter-grid-btn:hover {
+  border-color: #000;
+}
+.filter-grid-btn.active {
+  background: #000;
+  color: #fff;
+  border-color: #000;
+}
+.budget-slider {
+  width: 100%;
+  accent-color: #000;
+  margin-top: 12px;
+}
+.reset-filters-btn {
+  width: 100%;
+  padding: 14px;
+  background: #000;
+  color: #fff;
+  font-weight: 800;
+  text-transform: uppercase;
+  border: none;
+  cursor: pointer;
+}
+.reset-filters-btn:hover {
+  background: #333;
+}
+.catalog-main {
+  flex-grow: 1;
+}
+
+
+
+/* Mobile Filters Update */
+.mobile-filter-header {
+  display: none;
+  margin-bottom: 16px;
+  width: 100%;
+}
+.mobile-filter-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #000;
+  color: #fff;
+  padding: 12px;
+  font-weight: 800;
+  border: none;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.mobile-filter-close {
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 24px;
+}
+.mobile-filter-close h3 {
+  font-size: 18px;
+  font-weight: 800;
+}
+.mobile-filter-close button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+@media (max-width: 1024px) {
+  .catalog-layout {
+    flex-direction: column;
+    gap: 20px;
+  }
+  .mobile-only {
+    display: flex !important;
+  }
+  .desktop-only {
+    display: none !important;
+  }
+  .catalog-sidebar {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 300px;
+    height: 100vh;
+    background: #fff;
+    z-index: 9999;
+    padding: 24px;
+    overflow-y: auto;
+    transition: left 0.3s ease;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+  }
+  .catalog-sidebar.mobile-open {
+    left: 0 !important;
+    display: block !important;
+    visibility: visible !important;
+  }
+}
+
+
+
+
 </style>

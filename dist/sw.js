@@ -1,4 +1,4 @@
-const CACHE = 'alphashop07-v5';
+const CACHE = 'alphashop07-v12';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
