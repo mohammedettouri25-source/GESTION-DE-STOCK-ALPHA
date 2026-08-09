@@ -866,56 +866,30 @@ function getProductImagesList(product) {
     <!-- PAGE 1: HOME CATALOGUE VIEW -->
     <div v-if="currentPage === 'home'">
       
-      <!-- FULL-WIDTH PURE IMAGE HERO BANNER SHOWCASE -->
-      <section 
-        class="store-hero-slider-full"
-        @mouseenter="stopHeroAutoScroll"
-        @mouseleave="startHeroAutoScroll"
-      >
-        <div 
-          v-for="(slide, idx) in heroSlides" 
-          :key="idx"
-          :class="['full-slide-item', currentHeroIndex === idx ? 'active' : '']"
+      <!-- FULL-WIDTH VIDEO HERO BANNER -->
+      <section class="store-hero-video-full">
+        <!-- Video Background -->
+        <video 
+          class="hero-video-bg" 
+          autoplay 
+          loop 
+          muted 
+          playsinline
         >
-          <!-- Ambient Blurred Backdrop -->
-          <div class="hero-blur-bg" :style="{ backgroundImage: `url(${slide.image})` }"></div>
-          <div class="hero-dark-overlay"></div>
-          
-          <!-- Slide Inner Content -->
-          <div class="hero-slide-inner">
-            <!-- Left Info Box -->
-            <div class="hero-floating-overlay">
-              <span class="eyebrow-badge">{{ slide.eyebrow }}</span>
-              <h2 class="slide-title">{{ slide.title }}</h2>
-              <p class="slide-subtitle">{{ slide.subtitle }}</p>
-              <button @click="selectedCategory = slide.category" class="slide-cta-btn">
-                {{ currentLang === 'ar' ? 'اكتشف التشكيلة' : 'Découvrir la collection' }} <ChevronRight :size="14" />
-              </button>
-            </div>
-
-            <!-- Right Full Aspect Model Card -->
-            <div class="hero-model-card">
-              <img :src="slide.image" :alt="slide.title" class="hero-model-img" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Slider Arrow Navigation -->
-        <button @click="prevHeroSlide" class="slider-arrow prev" :title="currentLang === 'ar' ? 'السابق' : 'Précédent'">
-          <ChevronLeft :size="18" />
-        </button>
-        <button @click="nextHeroSlide" class="slider-arrow next" :title="currentLang === 'ar' ? 'التالي' : 'Suivant'">
-          <ChevronRight :size="18" />
-        </button>
-
-        <!-- Slider Dots Indicators -->
-        <div class="slider-dots">
-          <button 
-            v-for="(slide, idx) in heroSlides" 
-            :key="idx"
-            @click="setHeroSlide(idx)"
-            :class="['dot-btn', currentHeroIndex === idx ? 'active' : '']"
-          ></button>
+          <source src="/IMG_5111.MP4" type="video/mp4" />
+        </video>
+        
+        <!-- Dark Overlay for better text readability -->
+        <div class="hero-dark-overlay"></div>
+        
+        <!-- Animated Text Content -->
+        <div class="hero-video-content">
+          <h1 class="video-title animated-text">
+            {{ currentLang === 'ar' ? 'اكتشف أحدث تشكيلاتنا' : 'DÉCOUVREZ NOTRE NOUVELLE COLLECTION' }}
+          </h1>
+          <p class="video-subtitle animated-text-delay">
+            {{ currentLang === 'ar' ? 'أناقة لا مثيل لها لكل يوم' : 'L\'élégance au quotidien, sans compromis' }}
+          </p>
         </div>
       </section>
 
@@ -3703,5 +3677,96 @@ function getProductImagesList(product) {
   height: 100%;
   background: #059669;
   transition: width 1s linear;
+}
+
+/* Video Hero Banner */
+.store-hero-video-full {
+  position: relative;
+  width: 100vw;
+  height: 60vh;
+  min-height: 400px;
+  max-height: 800px;
+  overflow: hidden;
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+  margin-bottom: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (min-width: 768px) {
+  .store-hero-video-full {
+    height: 70vh;
+  }
+}
+.hero-video-bg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  min-width: 100%;
+  min-height: 100%;
+  width: auto;
+  height: auto;
+  transform: translate(-50%, -50%);
+  object-fit: cover;
+  z-index: 1;
+}
+.hero-dark-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 2;
+}
+.hero-video-content {
+  position: relative;
+  z-index: 3;
+  text-align: center;
+  color: white;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.video-title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+@media (min-width: 768px) {
+  .video-title {
+    font-size: 48px;
+  }
+}
+.video-subtitle {
+  font-size: 16px;
+  font-weight: 400;
+  margin: 0;
+  opacity: 0.9;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+@media (min-width: 768px) {
+  .video-subtitle {
+    font-size: 20px;
+  }
+}
+.animated-text {
+  animation: slideUpFade 1s ease-out forwards;
+}
+.animated-text-delay {
+  animation: slideUpFade 1s ease-out 0.3s forwards;
+  opacity: 0;
+}
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
