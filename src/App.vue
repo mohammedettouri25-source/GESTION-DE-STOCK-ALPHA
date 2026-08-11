@@ -902,7 +902,7 @@ const dailyProfitsReport = computed(() => {
     const grossProfit = d.revenue - d.cogs
     const onlineProfit = d.onlineRevenue - d.onlineCogs
     const offlineProfit = d.offlineRevenue - d.offlineCogs
-    const netProfit = grossProfit - d.expenses
+    const netProfit = grossProfit
     const margin = d.revenue > 0 ? ((netProfit / d.revenue) * 100).toFixed(1) : 0
     return {
       ...d,
@@ -938,7 +938,7 @@ const profitSummary = computed(() => {
   })
 
   const grossProfit = revenue - cogs
-  const netProfit = grossProfit - expenses
+  const netProfit = grossProfit
   const margin = revenue > 0 ? ((netProfit / revenue) * 100).toFixed(1) : 0
 
   return { revenue, cogs, expenses, grossProfit, netProfit, margin, salesCount, itemsCount, onlineProfit, offlineProfit }
@@ -990,9 +990,9 @@ const topProfitableProducts = computed(() => {
 
 function exportProfitsCsv() {
   const rows = [
-    'Date;Ventes;Articles;Chiffre d\'Affaires (MAD);Coût d\'Achat (COGS MAD);Dépenses (MAD);Bénéfice Net (MAD);Marge (%)',
+    'Date;Ventes;Articles;Chiffre d\'Affaires (MAD);Coût d\'Achat (COGS MAD);Bénéfice Net (MAD);Marge (%)',
     ...dailyProfitsReport.value.map(d =>
-      `${d.date};${d.salesCount};${d.itemsCount};${d.revenue};${d.cogs};${d.expenses};${d.netProfit};${d.margin}%`
+      `${d.date};${d.salesCount};${d.itemsCount};${d.revenue};${d.cogs};${d.netProfit};${d.margin}%`
     )
   ]
   const url = URL.createObjectURL(new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' }))
@@ -2185,11 +2185,7 @@ onMounted(async () => {
             <strong class="text-orange">{{ money(profitSummary.cogs) }}</strong>
             <em>Prix d'achat des produits vendus</em>
           </article>
-          <article class="profit-card">
-            <small>Dépenses Totales (المصاريف)</small>
-            <strong class="text-gray">{{ money(profitSummary.expenses) }}</strong>
-            <em>Dépenses enregistrées sur la période</em>
-          </article>
+
           <article class="profit-card highlight">
             <small>Bénéfice Net Total (الربح الصافي)</small>
             <strong :class="profitSummary.netProfit >= 0 ? 'text-green' : 'text-danger'">
@@ -2212,7 +2208,7 @@ onMounted(async () => {
           <div class="panel-title">
             <div>
               <h2>Rapport Journalier des Profits</h2>
-              <p>Détail jour par jour du chiffre d'affaires, des coûts, des dépenses et du bénéfice net</p>
+              <p>Détail jour par jour du chiffre d'affaires, des coûts et du bénéfice net</p>
             </div>
           </div>
 
@@ -2223,7 +2219,6 @@ onMounted(async () => {
               <span>Articles</span>
               <span>Ventes (MAD)</span>
               <span>Coût Achat (COGS)</span>
-              <span>Dépenses (MAD)</span>
               <span>Bénéfice Net (MAD)</span>
               <span>Marge %</span>
               <span>Détails</span>
@@ -2243,7 +2238,6 @@ onMounted(async () => {
                 <span>{{ d.itemsCount }} unité(s)</span>
                 <span class="font-bold">{{ money(d.revenue) }}</span>
                 <span class="text-muted">{{ money(d.cogs) }}</span>
-                <span class="text-muted">{{ money(d.expenses) }}</span>
                 <span style="display:flex; flex-direction:column; gap:4px;">
                   <strong :class="d.netProfit >= 0 ? 'profit-pill-success' : 'profit-pill-danger'">
                     {{ d.netProfit >= 0 ? '+' : '' }}{{ money(d.netProfit) }}

@@ -74,7 +74,7 @@ export const useShop = defineStore('shop', {
       return itemSum + cost * (Number(i.quantity) || 1)
     }, 0), 0),
     grossProfit: s => s.totalSales - s.totalCOGS,
-    netProfit: s => s.grossProfit - s.totalExpenses,
+    netProfit: s => s.grossProfit,
     profitMargin: s => s.totalSales ? ((s.netProfit / s.totalSales) * 100).toFixed(1) : 0,
     cartTotal: s => (s.cart || []).reduce((n, x) => n + (Number(x.price) || 0) * (Number(x.quantity) || 0), 0),
     totalSupplierDebt: s => (s.suppliers || []).reduce((sum, sup) => {
