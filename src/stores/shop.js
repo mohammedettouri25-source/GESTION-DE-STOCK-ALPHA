@@ -61,7 +61,12 @@ export const useShop = defineStore('shop', {
     lowStock: s => (s.products || []).flatMap(p => (p.variants || []).filter(v => (v.stock || 0) <= (v.min || 0)).map(v => ({ ...v, product: p.name, productId: p.id, purchasePrice: p.purchasePrice || 0 }))),
     todaySales: s => (s.sales || []).filter(x => x && !x.deleted && x.createdAt && new Date(x.createdAt).toDateString() === new Date().toDateString()).reduce((n, x) => n + (Number(x.total) || 0), 0),
     monthSales: s => (s.sales || []).filter(x => x && !x.deleted && x.createdAt && new Date(x.createdAt).getMonth() === new Date().getMonth()).reduce((n, x) => n + (Number(x.total) || 0), 0),
-    totalExpenses: s => (s.expenses || []).filter(x => x && !x.deleted).reduce((sum, x) => sum + Number(x.amount || 0), 0),
+    totalExpenses: s => (s.expenses || []).filter(x => {
+      if (!x || x.deleted) return false;
+      const cat = (x.category || '').toLowerCase();
+      if (cat.includes('finance') || cat.includes('tresorerie') || cat.includes('trésorerie')) return false;
+      return true;
+    }).reduce((sum, x) => sum + Number(x.amount || 0), 0),
     totalSales: s => (s.sales || []).filter(x => x && !x.deleted).reduce((sum, x) => sum + Number(x.total || 0), 0),
     totalCOGS: s => (s.sales || []).filter(x => x && !x.deleted).reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, i) => {
       const p = s.products.find(prod => prod.id === i.productId || prod.sku === i.sku)
@@ -308,22 +313,7 @@ export const useShop = defineStore('shop', {
       this.cart = []
     },
 
-    async confirmSaleStatus(saleId, status = 'confirmée', notes = '') {
-      const sale = this.sales.find(s => s.id === saleId)
-      if (sale) {
-        sale.status = status
-        sale.whatsappConfirmedAt = new Date().toISOString()
-        if (notes) sale.whatsappNotes = notes
-        const raw = cloneDeep(sale)
-        await localDb.sales.put(raw)
-        if (this.online) {
-          try {
-            await supabase.from('sales').upsert([raw])
-          } catch (_) {}
-        }
-        this.notify(`Commande ${sale.number || sale.id} ${status === 'confirmée' ? 'confirmée par WhatsApp ✓' : 'mise à jour'}`)
-      }
-    },
+
 
     async checkout(payment = 'Espèces', details = {}) {
       if (!this.cart.length) return this.notify('Ajoutez au moins un article au panier')

@@ -657,9 +657,6 @@ async function submitOrder() {
       items: cartSnapshot
     }
 
-    // Automatically send WhatsApp confirmation message to customer's phone from 0641432859
-    sendAutoWhatsAppNotification(orderSuccess.value)
-
     shop.clearCart()
     checkoutOpen.value = false
     cartOpen.value = false
@@ -670,77 +667,6 @@ async function submitOrder() {
   } finally {
     isSubmitting.value = false
   }
-}
-
-async function sendAutoWhatsAppNotification(order) {
-  if (!order || !order.phone) return
-
-  let phoneNum = String(order.phone).replace(/\D/g, '')
-  if (phoneNum.startsWith('0')) {
-    phoneNum = '212' + phoneNum.substring(1)
-  }
-
-  const itemsText = (order.items || []).map(item => {
-    const colorStr = item.color ? `اللون: ${item.color}` : ''
-    const sizeStr = item.size ? `المقاس: ${item.size}` : ''
-    const detailsStr = [colorStr, sizeStr].filter(Boolean).join(' | ') || (item.variant ? `(${item.variant})` : '')
-    return `• ${item.name}${detailsStr ? ` [${detailsStr}]` : ''} x${item.quantity || 1} (${(item.price || 0) * (item.quantity || 1)} DH)`
-  }).join('\n')
-
-  const msg = `Salam ${order.name} 👋
-تم تسجيل طلبكم بنجاح في ALPHA SHOP! 🛍️
-
-📦 رقم الطلب: ${order.trackingId || order.number}
-📍 التسليم إلى: ${order.city} ${order.address ? `- ${order.address}` : ''}
-
-🛍️ تفاصيل الطلبية:
-${itemsText || '—'}
-
-💰 المجموع الكلي: ${order.total} DH
-
-سنقوم بالتواصل معكم هاتفياً لتأكيد الشحن والتسليم.
-لأي استفسار يمكنك التواصل معنا عبر هذا الرقم: 0641432859 📱`
-
-  try {
-    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
-    const waUrl = isHttps ? 'https://localhost:3001/send-message' : 'http://localhost:3001/send-message'
-
-    await fetch(waUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        phone: phoneNum,
-        message: msg
-      })
-    })
-  } catch (e) {
-    console.warn('Could not send automated WhatsApp message via backend:', e.message)
-  }
-}
-
-function getWhatsAppOrderLink(order) {
-  const phone = '212641432859'
-  const itemsText = (order.items || []).map(item => {
-    const colorStr = item.color ? `اللون (Couleur): ${item.color}` : ''
-    const sizeStr = item.size ? `المقاس (Taille): ${item.size}` : ''
-    const detailsStr = [colorStr, sizeStr].filter(Boolean).join(' | ') || (item.variant ? `(${item.variant})` : '')
-    return `• ${item.name}${detailsStr ? ` [${detailsStr}]` : ''} x${item.quantity || 1} = ${(item.price || 0) * (item.quantity || 1)} DH`
-  }).join('\n')
-
-  const msg = `Salam ALPHA SHOP! N9ad nttaba3 l-commande dyali:
-
-📦 N° Commande: ${order.trackingId || order.number}
-👤 Nom: ${order.name}
-📞 Tél: ${order.phone}
-📍 Ville: ${order.city}
-🏠 Adresse: ${order.address || '—'}
-
-🛍️ المنتجات (Produits):
-${itemsText || '—'}
-
-💰 Total COD: ${order.total} DH`
-
-  return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
 }
 
 function getProductImage(product) {
@@ -1394,13 +1320,7 @@ function getProductImagesList(product) {
         </div>
 
         <div class="success-actions">
-          <a 
-            :href="getWhatsAppOrderLink(orderSuccess)"
-            target="_blank"
-            class="wa-track-btn"
-          >
-            <span>{{ currentLang === 'ar' ? 'تتبع الطلب عبر الواتساب (WhatsApp)' : 'التتبع عبر الواتساب (WhatsApp)' }}</span>
-          </a>
+
 
           <button 
             @click="orderSuccess = null; backToHome()"
@@ -1526,19 +1446,7 @@ function getProductImagesList(product) {
           </ul>
         </div>
 
-        <!-- Col 4: WhatsApp Contact & Hours -->
-        <div class="footer-col contact-col">
-          <h4 class="footer-heading">{{ currentLang === 'ar' ? 'خدمة العملاء' : 'Service Client' }}</h4>
-          <p class="contact-sub">{{ currentLang === 'ar' ? 'طيلة أيام الأسبوع: من 09:00 إلى 22:00' : 'Du Lundi au Dimanche: 09h00 - 22h00' }}</p>
-          <a 
-            href="https://wa.me/212641432859?text=Salam%20ALPHASHOP07!" 
-            target="_blank" 
-            class="wa-footer-btn-dark"
-          >
-            <MessageCircle :size="18" />
-            <span>WhatsApp: <b>06 41 43 28 59</b></span>
-          </a>
-        </div>
+
       </div>
 
       <!-- Footer Bottom Bar -->
