@@ -658,6 +658,36 @@ const nav = computed(() => navItems[shop.language] || navItems.fr)
 // --- Real Dynamic Dashboard Sales Performance Chart ---
 const chartPeriod = ref('7days') // '7days' | 'month'
 
+// --- Dashboard Profit Calculator ---
+const calcStartDate = ref('')
+const calcEndDate = ref('')
+const calculatedProfit = computed(() => {
+  if (!calcStartDate.value || !calcEndDate.value) return 0
+  const validSales = (shop.sales || []).filter(s => s && !s.deleted && s.createdAt)
+  
+  let totalRevenue = 0
+  let totalCogs = 0
+
+  validSales.forEach(sale => {
+    const dateKey = new Date(sale.createdAt).toISOString().slice(0, 10)
+    if (dateKey >= calcStartDate.value && dateKey <= calcEndDate.value) {
+      totalRevenue += Number(sale.total) || 0
+      
+      let saleCogs = 0
+      ;(sale.items || []).forEach(item => {
+        const q = Number(item.quantity) || 1
+        const product = shop.products.find(p => p.id === item.productId || p.sku === item.sku)
+        const costPerUnit = Number(item.purchasePrice || product?.purchasePrice || 0)
+        saleCogs += costPerUnit * q
+      })
+
+      totalCogs += saleCogs
+    }
+  })
+  
+  return totalRevenue - totalCogs
+})
+
 const salesPerformanceChart = computed(() => {
   const result = []
   const today = new Date()
@@ -1637,6 +1667,30 @@ onMounted(async () => {
             <small v-if="chartPeriod === 'month'" class="chart-scroll-hint">
               👈 {{ shop.language === 'ar' ? 'إسحب الأفقي لرؤية الـ 30 يوماً كاملة' : 'Glissez horizontalement pour voir les 30 jours' }} 👉
             </small>
+          </article>
+          <article class="panel">
+            <div class="panel-title">
+              <div>
+                <h2>{{ shop.language === 'ar' ? 'حاسبة الأرباح' : 'Calculateur de Profits' }}</h2>
+                <p>{{ shop.language === 'ar' ? 'أحسب الربح الصافي في فترة محددة' : 'Calculez le bénéfice net sur une période' }}</p>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
+              <div style="display:flex; gap:10px;">
+                <label style="flex:1;">
+                  <span style="font-size:11px; font-weight:600; color:#64748b;">{{ shop.language === 'ar' ? 'من :' : 'De :' }}</span>
+                  <input type="date" v-model="calcStartDate" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px; margin-top:4px;" />
+                </label>
+                <label style="flex:1;">
+                  <span style="font-size:11px; font-weight:600; color:#64748b;">{{ shop.language === 'ar' ? 'إلى :' : 'À :' }}</span>
+                  <input type="date" v-model="calcEndDate" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px; margin-top:4px;" />
+                </label>
+              </div>
+              <div style="background:#f0fdf4; border:1px solid #bbf7d0; padding:16px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:13px; font-weight:700; color:#166534;">{{ shop.language === 'ar' ? 'الربح الصافي :' : 'Bénéfice Net :' }}</span>
+                <strong style="font-size:20px; color:#16a34a;">{{ money(calculatedProfit) }}</strong>
+              </div>
+            </div>
           </article>
           <article class="panel">
             <div class="panel-title">
