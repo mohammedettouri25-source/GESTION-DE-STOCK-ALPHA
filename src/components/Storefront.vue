@@ -94,11 +94,16 @@ onMounted(() => {
 })
 
 // View / Navigation State
-const currentPage = ref('home') // 'home' | 'product'
+const currentPage = ref('home') // 'home' | 'product' | 'catalog'
 const selectedProductId = ref(null)
 const activeProduct = ref(null)
 const selectedVariant = ref(null)
 const activeImageIndex = ref(0)
+
+watch(currentPage, () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+})
+
 
 // Filters State
 const searchQuery = ref('')
