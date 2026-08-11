@@ -333,7 +333,7 @@ export const useShop = defineStore('shop', {
           id: crypto.randomUUID(),
           number: saleNum,
           trackingId: details.trackingId || details.number || saleNum,
-          createdAt: new Date().toISOString(),
+          createdAt: details.createdAt || new Date().toISOString(),
           items: this.cart.map(({ productId, variantId, sku, name, variant, color, size, price, quantity }) => ({
             productId,
             variantId,

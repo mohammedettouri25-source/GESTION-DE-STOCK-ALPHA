@@ -20,6 +20,7 @@ const order = ref({
   discount: 0,
   shipping: 0,
   paidAmount: null,
+  customDate: '',
   customer: { name: '', phone: '', cityId: '', city: '', address: '', note: '' },
   sendOzon: true,
   ozon: {
@@ -1363,6 +1364,7 @@ async function submitOrder() {
       paidAmount: actualPaidAmount.value,
       remainingBalance: remainingBalance.value,
       saleType: order.value.type,
+      createdAt: order.value.customDate ? `${order.value.customDate}T${new Date().toISOString().split('T')[1]}` : undefined,
       customer: {
         ...c,
         name: c.name || (order.value.type === 'offline' ? 'Vente Comptoir' : '')
@@ -2663,6 +2665,11 @@ onMounted(async () => {
             </button>
           </div>
         </div>
+
+        <label style="display:block; margin-bottom:16px;">
+          <span style="font-size:12px; font-weight:600; color:#4b5563; display:block; margin-bottom:6px;">Date de la commande (Optionnel, laissez vide pour Aujourd'hui)</span>
+          <input type="date" v-model="order.customDate" style="width:100%; padding:10px; border-radius:8px; border:1px solid #d1d5db; font-size:14px;" />
+        </label>
 
         <div class="checkout-summary">
           <span>Sous-total <b>{{money(shop.cartTotal)}}</b></span>
