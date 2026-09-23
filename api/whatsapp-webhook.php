@@ -50,7 +50,11 @@ function generateAiReplyPHP($provider, $apiKey, $model, $systemPrompt, $userMsg)
     $apiKey = trim($apiKey);
 
     // Auto-detect provider based on key format
-    if (strpos($apiKey, 'AQ.') === 0 || strpos($apiKey, 'AIza') === 0) {
+    if (strpos($apiKey, 'AQ.') === 0 || strpos($apiKey, 'EAA') === 0) {
+        return "⚠️ المفتاح الذي أدخلته يبدو أنه مفتاح Meta WhatsApp Access Token وليس مفتاح ذكاء اصطناعي.\nيرجى الحصول على مفتاح Gemini مجاني يبدأ بـ AIzaSy من الرابط: https://aistudio.google.com/app/apikey";
+    }
+
+    if (strpos($apiKey, 'AIza') === 0) {
         $provider = 'gemini';
     } else if (strpos($apiKey, 'gsk_') === 0) {
         $provider = 'groq';
