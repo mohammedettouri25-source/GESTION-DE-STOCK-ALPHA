@@ -1352,7 +1352,11 @@ export const useShop = defineStore('shop', {
         stock: (p.variants || []).reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
       }))
 
-      const res = await fetch('/api/whatsapp-webhook', {
+      const endpoint = (typeof window !== 'undefined' && (window.location.origin.includes('alphashop07.com') || window.location.origin.includes('hostinger')))
+        ? '/api/whatsapp-webhook.php'
+        : '/api/whatsapp-webhook'
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1363,7 +1367,14 @@ export const useShop = defineStore('shop', {
         })
       })
 
-      const data = await res.json()
+      const rawText = await res.text()
+      let data = {}
+      try {
+        data = JSON.parse(rawText)
+      } catch (e) {
+        throw new Error('تعذر قراءة الاستجابة من السيرفر (خطأ في الصيغة)')
+      }
+
       if (!res.ok || data.error) throw new Error(data.error || 'Failed to simulate AI reply')
       return data.response
     }

@@ -20,7 +20,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $token = $_GET['hub_verify_token'] ?? $_GET['hub_verify_token'] ?? ($_GET['hub.verify_token'] ?? '');
     $challenge = $_GET['hub_challenge'] ?? $_GET['hub_challenge'] ?? ($_GET['hub.challenge'] ?? '');
 
-    // Allow override from query param
     if (isset($_GET['token'])) {
         $token = $_GET['token'];
     }
@@ -42,15 +41,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 $raw_input = file_get_contents('php://input');
 $body = json_decode($raw_input, true) ?? [];
 
-// Helper function to call OpenAI API via cURL
-function callOpenAI($apiKey, $model, $systemPrompt, $userMsg) {
+// Helper function to call AI APIs (OpenAI, Gemini, Groq)
+function generateAiReplyPHP($provider, $apiKey, $model, $systemPrompt, $userMsg) {
     if (empty($apiKey)) {
-        return "Salam! 👋 شكراً لتواصلك معنا. كيف يمكننا مساعدتك اليوم؟";
+        return "Salam! 👋 شكراً لتواصلك معنا في متجرنا. كيف يمكننا مساعدتك اليوم؟";
     }
 
+    // Google Gemini API
+    if ($provider === 'gemini') {
+        $geminiModel = (!empty($model) && strpos($model, 'gemini') !== false) ? $model : 'gemini-1.5-flash';
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$geminiModel}:generateContent?key=" . urlencode($apiKey);
+
+        $payload = [
+            'contents' => [
+                [
+                    'parts' => [
+                        ['text' => $systemPrompt . "\n\nسؤال الزبون: " . $userMsg]
+                    ]
+                ]
+            ]
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+
+        $result = curl_exec($ch);
+        curl_close($ch);
+
+        $json = json_decode($result, true);
+        if (isset($json['error']['message'])) {
+            return "⚠️ خطأ من Gemini API: " . $json['error']['message'];
+        }
+        return $json['candidates'][0]['content']['parts'][0]['text'] ?? "Salam! 👋 مرحباً بك في متجرنا. كيف يمكننا مساعدتك؟";
+    }
+
+    // Groq (Llama 3)
+    if ($provider === 'groq') {
+        $groqModel = (!empty($model) && strpos($model, 'llama') !== false) ? $model : 'llama-3.3-70b-versatile';
+        $ch = curl_init('https://api.groq.com/openai/v1/chat/completions');
+        $payload = [
+            'model' => $groqModel,
+            'messages' => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userMsg]
+            ]
+        ];
+
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $apiKey
+        ]);
+
+        $result = curl_exec($ch);
+        curl_close($ch);
+
+        $json = json_decode($result, true);
+        if (isset($json['error']['message'])) {
+            return "⚠️ خطأ من Groq API: " . $json['error']['message'];
+        }
+        return $json['choices'][0]['message']['content'] ?? "Salam! 👋 مرحباً بك في متجرنا.";
+    }
+
+    // Default: OpenAI / ChatGPT
+    $openAiModel = (!empty($model) && strpos($model, 'gpt') !== false) ? $model : 'gpt-4o-mini';
     $ch = curl_init('https://api.openai.com/v1/chat/completions');
     $payload = [
-        'model' => $model ?: 'gpt-4o-mini',
+        'model' => $openAiModel,
         'messages' => [
             ['role' => 'system', 'content' => $systemPrompt],
             ['role' => 'user', 'content' => $userMsg]
@@ -70,53 +132,28 @@ function callOpenAI($apiKey, $model, $systemPrompt, $userMsg) {
     curl_close($ch);
 
     $json = json_decode($result, true);
-    return $json['choices'][0]['message']['content'] ?? "Salam! 👋 شكراً لتواصلك معنا. مرحباً بك في متجرنا.";
-}
-
-// Helper function to send message via Meta WhatsApp Cloud API
-function sendMetaWhatsAppMessage($phoneId, $waToken, $toPhone, $messageText) {
-    if (empty($phoneId) || empty($waToken)) return false;
-
-    // Convert markdown **text** to WhatsApp *text*
-    $formattedText = preg_replace('/\*\*(.*?)\*\*/', '*$1*', $messageText);
-
-    $ch = curl_init("https://graph.facebook.com/v18.0/{$phoneId}/messages");
-    $payload = [
-        'messaging_product' => 'whatsapp',
-        'recipient_type' => 'individual',
-        'to' => $toPhone,
-        'type' => 'text',
-        'text' => ['body' => $formattedText]
-    ];
-
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'Authorization: Bearer ' . $waToken
-    ]);
-
-    $res = curl_exec($ch);
-    curl_close($ch);
-    return json_decode($res, true);
+    if (isset($json['error']['message'])) {
+        return "⚠️ خطأ من OpenAI API: " . $json['error']['message'];
+    }
+    return $json['choices'][0]['message']['content'] ?? "Salam! 👋 مرحباً بك في متجرنا.";
 }
 
 // Dashboard Simulation Action
 if (isset($body['action']) && $body['action'] === 'simulate') {
     $msg = $body['message'] ?? 'السلام عليكم';
     $settings = $body['settings'] ?? [];
-    $apiKey = $settings['ai_api_key'] ?? '';
-    $model = $settings['ai_model'] ?? 'gpt-4o-mini';
+    $apiKey = trim($settings['ai_api_key'] ?? '');
+    $provider = $settings['ai_provider'] ?? 'openai';
+    $model = $settings['ai_model'] ?? '';
     $prompt = $settings['system_prompt'] ?? 'أنت مساعد مبيعات احترافي للمتجر.';
 
-    $reply = callOpenAI($apiKey, $model, $prompt, $msg);
+    $reply = generateAiReplyPHP($provider, $apiKey, $model, $prompt, $msg);
     header('Content-Type: application/json');
     echo json_encode(['success' => true, 'response' => $reply]);
     exit;
 }
 
-// Incoming Meta WhatsApp Event
+// Meta Webhook Event POST
 $entry = $body['entry'][0] ?? null;
 $changes = $entry['changes'][0] ?? null;
 $value = $changes['value'] ?? null;
@@ -128,15 +165,30 @@ if (!empty($messages)) {
     $msgText = $msg['text']['body'] ?? '';
 
     if (!empty($fromPhone) && !empty($msgText)) {
-        // Fallback default AI response
         $prompt = "أنت مساعد مبيعات احترافي للمتجر في المغرب. تجيب بالدارجة المغربية أو الفرنسية بأسلوب مؤدب وسريع.";
-        $reply = callOpenAI('', 'gpt-4o-mini', $prompt, $msgText);
+        $reply = generateAiReplyPHP('openai', '', 'gpt-4o-mini', $prompt, $msgText);
         
-        // Dispatched if phone ID and token are present in request or env
         $phoneId = $_ENV['WHATSAPP_PHONE_NUMBER_ID'] ?? '';
         $waToken = $_ENV['WHATSAPP_TOKEN'] ?? '';
         if ($phoneId && $waToken) {
-            sendMetaWhatsAppMessage($phoneId, $waToken, $fromPhone, $reply);
+            // Send Meta response
+            $ch = curl_init("https://graph.facebook.com/v18.0/{$phoneId}/messages");
+            $payload = [
+                'messaging_product' => 'whatsapp',
+                'recipient_type' => 'individual',
+                'to' => $fromPhone,
+                'type' => 'text',
+                'text' => ['body' => preg_replace('/\*\*(.*?)\*\*/', '*$1*', $reply)]
+            ];
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $waToken
+            ]);
+            curl_exec($ch);
+            curl_close($ch);
         }
     }
 }

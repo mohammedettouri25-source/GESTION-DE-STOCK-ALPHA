@@ -1462,6 +1462,17 @@ async function saveWaSettings() {
   await shop.saveWhatsAppSettings(shop.whatsappSettings)
 }
 
+function onAiProviderChange() {
+  const p = shop.whatsappSettings.ai_provider
+  if (p === 'gemini') {
+    shop.whatsappSettings.ai_model = 'gemini-1.5-flash'
+  } else if (p === 'groq') {
+    shop.whatsappSettings.ai_model = 'llama-3.3-70b-versatile'
+  } else {
+    shop.whatsappSettings.ai_model = 'gpt-4o-mini'
+  }
+}
+
 async function runAiSimulation() {
   if (!simInput.value.trim() || simulating.value) return
   const query = simInput.value.trim()
@@ -2517,7 +2528,7 @@ onMounted(async () => {
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
               <label>
                 <span style="font-weight:600; font-size:13px;">مزود الذكاء الاصطناعي:</span>
-                <select v-model="shop.whatsappSettings.ai_provider" style="margin-top:4px;">
+                <select v-model="shop.whatsappSettings.ai_provider" @change="onAiProviderChange" style="margin-top:4px;">
                   <option value="openai">OpenAI (ChatGPT)</option>
                   <option value="gemini">Google Gemini</option>
                   <option value="groq">Groq (Llama 3)</option>
