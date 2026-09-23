@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase'
   const table = localDb[t]
   if (!table) return
   const op = table.put.bind(table)
-  table.put = async function(i, k) {
+  table.put = async function (i, k) {
     try { return await op(i, k) }
     catch (e) {
       console.error(`🚨 FATAL DEXIE PUT ERROR IN ${t}! Payload:`, i)
@@ -15,7 +15,7 @@ import { supabase } from '../lib/supabase'
     }
   }
   const oa = table.add.bind(table)
-  table.add = async function(i, k) {
+  table.add = async function (i, k) {
     try { return await oa(i, k) }
     catch (e) {
       console.error(`🚨 FATAL DEXIE ADD ERROR IN ${t}! Payload:`, i)
@@ -23,7 +23,7 @@ import { supabase } from '../lib/supabase'
     }
   }
   const od = table.delete.bind(table)
-  table.delete = async function(k) {
+  table.delete = async function (k) {
     try { return await od(k) }
     catch (e) {
       console.error(`🚨 FATAL DEXIE DELETE ERROR IN ${t}! Key:`, k)
@@ -108,10 +108,10 @@ export const useShop = defineStore('shop', {
       const cleanProds = []
       for (const p of localProds) {
         if (p.id && String(p.id).startsWith('b1000000-0000-4000-8000-')) {
-          await localDb.products.delete(p.id).catch(() => {})
+          await localDb.products.delete(p.id).catch(() => { })
           if (supabase) {
-            supabase.from('products').delete().eq('id', p.id).then(() => {}).catch(() => {})
-            supabase.from('app_sync').delete().eq('entity_id', p.id).then(() => {}).catch(() => {})
+            supabase.from('products').delete().eq('id', p.id).then(() => { }).catch(() => { })
+            supabase.from('app_sync').delete().eq('entity_id', p.id).then(() => { }).catch(() => { })
           }
         } else {
           cleanProds.push(p)
@@ -123,10 +123,10 @@ export const useShop = defineStore('shop', {
       const validSales = []
       for (const s of rawSales) {
         if (!s || !s.id || s.deleted || !s.createdAt || ((!s.number || s.number === '') && Number(s.total || 0) === 0 && !s.customer?.name && !s.customer?.phone)) {
-          await localDb.sales.delete(s.id).catch(() => {})
+          await localDb.sales.delete(s.id).catch(() => { })
           if (supabase && s?.id) {
-            supabase.from('sales').delete().eq('id', s.id).then(() => {}).catch(() => {})
-            supabase.from('app_sync').delete().eq('entity_id', s.id).then(() => {}).catch(() => {})
+            supabase.from('sales').delete().eq('id', s.id).then(() => { }).catch(() => { })
+            supabase.from('app_sync').delete().eq('entity_id', s.id).then(() => { }).catch(() => { })
           }
         } else {
           validSales.push(s)
@@ -151,8 +151,8 @@ export const useShop = defineStore('shop', {
       if (typeof window !== 'undefined' && !window._alphashopPollInterval) {
         window._alphashopPollInterval = setInterval(() => {
           if (navigator.onLine) {
-            this.pullFromSupabase().catch(() => {})
-            this.sync().catch(() => {})
+            this.pullFromSupabase().catch(() => { })
+            this.sync().catch(() => { })
           }
         }, 10000)
       }
@@ -248,8 +248,8 @@ export const useShop = defineStore('shop', {
               images: imagesList,
               variants: plainP.variants || [],
               description: plainP.category || ''
-            }, { onConflict: 'id' }).then(() => {}).catch(() => {})
-          } catch (_) {}
+            }, { onConflict: 'id' }).then(() => { }).catch(() => { })
+          } catch (_) { }
         }
 
         this.notify(product && product.id ? 'Produit mis à jour ✓' : 'Produit créé ✓')
@@ -268,7 +268,7 @@ export const useShop = defineStore('shop', {
         await this.queue('products', { id, deleted: true })
 
         if (supabase) {
-          supabase.from('products').delete().eq('id', id).then(() => {}).catch(() => {})
+          supabase.from('products').delete().eq('id', id).then(() => { }).catch(() => { })
         }
 
         this.notify('Produit supprimé')
@@ -456,7 +456,7 @@ export const useShop = defineStore('shop', {
                   i === vIdx ? { ...v, stock: (Number(v.stock) || 0) + (Number(item.quantity) || 1) } : { ...v }
                 )
                 const updatedProduct = cloneDeep({ ...rawProduct, variants: updatedVariants })
-                
+
                 try {
                   await localDb.products.put(updatedProduct)
                 } catch (e) {
@@ -495,13 +495,13 @@ export const useShop = defineStore('shop', {
         } catch (e) {
           throw new Error(`localDb.sales.delete: ${e.message}`)
         }
-        
+
         this.sales.splice(index, 1)
 
         await this.queue('sales', { id: targetId, deleted: true })
 
         if (supabase) {
-          supabase.from('sales').delete().eq('id', targetId).then(() => {}).catch(() => {})
+          supabase.from('sales').delete().eq('id', targetId).then(() => { }).catch(() => { })
         }
 
         this.notify(restoreStock ? 'Commande supprimée & stock réintégré ✓' : 'Commande supprimée ✓')
@@ -514,7 +514,7 @@ export const useShop = defineStore('shop', {
     async updateSale(updatedSale) {
       try {
         if (!updatedSale || !updatedSale.id) return
-        
+
         // Clean Vue proxies to prevent IndexedDB DataCloneError
         const raw = cloneDeep(updatedSale)
         const index = this.sales.findIndex(s => s.id === raw.id)
@@ -545,7 +545,7 @@ export const useShop = defineStore('shop', {
             number: saleToSave.number || '',
             total: Number(saleToSave.total) || 0,
             payment_method: saleToSave.payment || 'cash'
-          }, { onConflict: 'id' }).then(() => {}).catch(() => {})
+          }, { onConflict: 'id' }).then(() => { }).catch(() => { })
         }
 
         this.notify(`Commande ${saleToSave.number} mise à jour ✓`)
@@ -578,7 +578,7 @@ export const useShop = defineStore('shop', {
         for (const job of jobs) {
           const entityId = String(job.payload?.id || job.id)
           let syncPayload = cloneDeep(job.payload);
-          
+
           const { error } = await supabase
             .from('app_sync')
             .upsert(
@@ -589,7 +589,7 @@ export const useShop = defineStore('shop', {
             if (error.code === '42P01') this.notify('Supabase : appliquez la migration SQL (0002_offline_sync.sql)')
             else this.notify(`Erreur Sync Supabase : ${error.message}`)
             console.error('Supabase sync error:', error)
-            
+
             // If the payload is too large or times out (57014), skip it to unblock queue
             if (error.code === '57014' || String(error.message).includes('500') || String(error.message).includes('timeout') || String(error.message).includes('large')) {
               console.warn('Skipping massive payload job to unblock queue:', job.id)
@@ -602,7 +602,7 @@ export const useShop = defineStore('shop', {
           // Dual sync: Also attempt upsert into normalized products / sales tables for direct SQL viewing
           if (job.table === 'products' && job.payload) {
             if (job.payload.deleted) {
-              await supabase.from('products').delete().eq('id', entityId).then(() => {}).catch(() => {})
+              await supabase.from('products').delete().eq('id', entityId).then(() => { }).catch(() => { })
             } else {
               const imagesList = Array.isArray(job.payload.images) && job.payload.images.length > 0
                 ? job.payload.images
@@ -621,7 +621,7 @@ export const useShop = defineStore('shop', {
                 images: imagesList,
                 variants: job.payload.variants || [],
                 description: job.payload.category || ''
-              }, { onConflict: 'id' }).then(() => {}).catch(() => {})
+              }, { onConflict: 'id' }).then(() => { }).catch(() => { })
             }
           } else if (job.table === 'sales' && job.payload) {
             await supabase.from('sales').upsert({
@@ -629,7 +629,7 @@ export const useShop = defineStore('shop', {
               number: job.payload.number || '',
               total: Number(job.payload.total) || 0,
               payment_method: job.payload.paymentMethod || 'cash'
-            }, { onConflict: 'id' }).then(() => {}).catch(() => {})
+            }, { onConflict: 'id' }).then(() => { }).catch(() => { })
           }
 
           await localDb.queue.delete(job.id)
@@ -680,8 +680,8 @@ export const useShop = defineStore('shop', {
               if (payload.deleted || (payload.id && String(payload.id).startsWith('b1000000-0000-4000-8000-'))) {
                 deletedProductIds.push(entity_id)
                 if (supabase && entity_id) {
-                  supabase.from('products').delete().eq('id', entity_id).then(() => {}).catch(() => {})
-                  supabase.from('app_sync').delete().eq('entity_id', entity_id).then(() => {}).catch(() => {})
+                  supabase.from('products').delete().eq('id', entity_id).then(() => { }).catch(() => { })
+                  supabase.from('app_sync').delete().eq('entity_id', entity_id).then(() => { }).catch(() => { })
                 }
               } else if (payload.id) {
                 if (!payload.images) payload.images = payload.image ? [payload.image] : []
@@ -693,8 +693,8 @@ export const useShop = defineStore('shop', {
               if (payload.deleted || payload.deleted === true || isDummy) {
                 deletedSaleIds.push(entity_id)
                 if (supabase && entity_id) {
-                  supabase.from('sales').delete().eq('id', entity_id).then(() => {}).catch(() => {})
-                  supabase.from('app_sync').delete().eq('entity_id', entity_id).then(() => {}).catch(() => {})
+                  supabase.from('sales').delete().eq('id', entity_id).then(() => { }).catch(() => { })
+                  supabase.from('app_sync').delete().eq('entity_id', entity_id).then(() => { }).catch(() => { })
                 }
               } else if (payload.id) {
                 salesToPut.push(payload)
@@ -725,7 +725,7 @@ export const useShop = defineStore('shop', {
         if (dbProducts && dbProducts.length > 0) {
           for (const dbP of dbProducts) {
             if (dbP.id && String(dbP.id).startsWith('b1000000-0000-4000-8000-')) {
-              if (supabase) supabase.from('products').delete().eq('id', dbP.id).then(() => {}).catch(() => {})
+              if (supabase) supabase.from('products').delete().eq('id', dbP.id).then(() => { }).catch(() => { })
               continue
             }
             const dbImg = dbP.image || (Array.isArray(dbP.images) && dbP.images[0] ? dbP.images[0] : '')
@@ -772,7 +772,7 @@ export const useShop = defineStore('shop', {
         if (dbSales && dbSales.length > 0) {
           for (const dbS of dbSales) {
             if (!dbS || !dbS.id || ((!dbS.number || dbS.number === '') && Number(dbS.total || 0) === 0 && !dbS.customer_id)) {
-              if (supabase && dbS?.id) supabase.from('sales').delete().eq('id', dbS.id).then(() => {}).catch(() => {})
+              if (supabase && dbS?.id) supabase.from('sales').delete().eq('id', dbS.id).then(() => { }).catch(() => { })
               continue
             }
 
@@ -796,18 +796,18 @@ export const useShop = defineStore('shop', {
         }
 
         // Perform fast batch deletes in Dexie (single transaction per table)
-        if (deletedProductIds.length) await localDb.products.bulkDelete(deletedProductIds).catch(() => {})
-        if (deletedSaleIds.length) await localDb.sales.bulkDelete(deletedSaleIds).catch(() => {})
-        if (deletedCustomerIds.length) await localDb.customers.bulkDelete(deletedCustomerIds).catch(() => {})
-        if (deletedSupplierIds.length && localDb.suppliers) await localDb.suppliers.bulkDelete(deletedSupplierIds).catch(() => {})
-        if (deletedExpenseIds.length && localDb.expenses) await localDb.expenses.bulkDelete(deletedExpenseIds).catch(() => {})
+        if (deletedProductIds.length) await localDb.products.bulkDelete(deletedProductIds).catch(() => { })
+        if (deletedSaleIds.length) await localDb.sales.bulkDelete(deletedSaleIds).catch(() => { })
+        if (deletedCustomerIds.length) await localDb.customers.bulkDelete(deletedCustomerIds).catch(() => { })
+        if (deletedSupplierIds.length && localDb.suppliers) await localDb.suppliers.bulkDelete(deletedSupplierIds).catch(() => { })
+        if (deletedExpenseIds.length && localDb.expenses) await localDb.expenses.bulkDelete(deletedExpenseIds).catch(() => { })
 
         // Perform batch puts for fast single-transaction IndexedDB updates
-        if (productsToPut.length) await localDb.products.bulkPut(productsToPut).catch(() => {})
-        if (salesToPut.length) await localDb.sales.bulkPut(salesToPut).catch(() => {})
-        if (customersToPut.length) await localDb.customers.bulkPut(customersToPut).catch(() => {})
-        if (suppliersToPut.length && localDb.suppliers) await localDb.suppliers.bulkPut(suppliersToPut).catch(() => {})
-        if (expensesToPut.length && localDb.expenses) await localDb.expenses.bulkPut(expensesToPut).catch(() => {})
+        if (productsToPut.length) await localDb.products.bulkPut(productsToPut).catch(() => { })
+        if (salesToPut.length) await localDb.sales.bulkPut(salesToPut).catch(() => { })
+        if (customersToPut.length) await localDb.customers.bulkPut(customersToPut).catch(() => { })
+        if (suppliersToPut.length && localDb.suppliers) await localDb.suppliers.bulkPut(suppliersToPut).catch(() => { })
+        if (expensesToPut.length && localDb.expenses) await localDb.expenses.bulkPut(expensesToPut).catch(() => { })
 
         // Update Pinia state in one single reactive update
         this.products = await localDb.products.toArray()
@@ -826,7 +826,7 @@ export const useShop = defineStore('shop', {
     subscribeRealtime() {
       if (!supabase) return
       if (realtimeChannel) {
-        try { supabase.removeChannel(realtimeChannel) } catch (_) {}
+        try { supabase.removeChannel(realtimeChannel) } catch (_) { }
         realtimeChannel = null
       }
       try {
@@ -838,7 +838,7 @@ export const useShop = defineStore('shop', {
             const dbImg = dbP.image || (Array.isArray(dbP.images) && dbP.images[0] ? dbP.images[0] : '')
             const dbImgs = Array.isArray(dbP.images) && dbP.images.length > 0 ? dbP.images : (dbImg ? [dbImg] : [])
             const dbVars = Array.isArray(dbP.variants) ? dbP.variants : []
-            
+
             const updated = {
               id: dbP.id,
               name: dbP.name,
@@ -915,20 +915,20 @@ export const useShop = defineStore('shop', {
               }
             } else if (entity_type === 'suppliers') {
               if (payload.deleted) {
-                localDb.suppliers?.delete(entity_id).catch(() => {})
+                localDb.suppliers?.delete(entity_id).catch(() => { })
                 this.suppliers = this.suppliers.filter(x => x.id !== entity_id)
               } else if (payload.id) {
-                localDb.suppliers?.put(payload).catch(() => {})
+                localDb.suppliers?.put(payload).catch(() => { })
                 const idx = this.suppliers.findIndex(x => x.id === payload.id)
                 if (idx < 0) this.suppliers.unshift(payload)
                 else this.suppliers.splice(idx, 1, payload)
               }
             } else if (entity_type === 'expenses') {
               if (payload.deleted) {
-                localDb.expenses?.delete(entity_id).catch(() => {})
+                localDb.expenses?.delete(entity_id).catch(() => { })
                 this.expenses = this.expenses.filter(x => x.id !== entity_id)
               } else if (payload.id) {
-                localDb.expenses?.put(payload).catch(() => {})
+                localDb.expenses?.put(payload).catch(() => { })
                 const idx = this.expenses.findIndex(x => x.id === payload.id)
                 if (idx < 0) this.expenses.unshift(payload)
                 else this.expenses.splice(idx, 1, payload)
@@ -941,7 +941,7 @@ export const useShop = defineStore('shop', {
             const img = p.image || (Array.isArray(p.images) && p.images[0] ? p.images[0] : '')
             const imgs = Array.isArray(p.images) && p.images.length > 0 ? p.images : (img ? [img] : [])
             const vars = Array.isArray(p.variants) ? p.variants : []
-            
+
             const pIdx = this.products.findIndex(x => x.id === p.id)
             if (pIdx >= 0) {
               const current = cloneDeep(this.products[pIdx])
@@ -954,7 +954,7 @@ export const useShop = defineStore('shop', {
               if (img) current.image = img
               if (imgs.length) current.images = imgs
               if (vars.length) current.variants = vars
-              
+
               localDb.products.put(current)
               this.products.splice(pIdx, 1, current)
             } else {
@@ -1080,7 +1080,7 @@ export const useShop = defineStore('shop', {
             totalPurchases: Math.max(0, (Number(existing.totalPurchases) || 0) - creditAmount),
             creditHistory: (existing.creditHistory || []).filter(h => h.saleNumber !== saleNumber)
           })
-          
+
           try {
             await localDb.customers.put(updated)
           } catch (e) {
@@ -1143,7 +1143,7 @@ export const useShop = defineStore('shop', {
           balanceOwed,
           createdAt: supplier.createdAt || new Date().toISOString()
         }
-        await localDb.suppliers?.put(s).catch(() => {})
+        await localDb.suppliers?.put(s).catch(() => { })
         const idx = this.suppliers.findIndex(x => x.id === s.id)
         if (idx < 0) this.suppliers.unshift(s)
         else this.suppliers.splice(idx, 1, s)
@@ -1165,7 +1165,7 @@ export const useShop = defineStore('shop', {
         s.totalPaid = (Number(s.totalPaid) || 0) + amount
         s.balanceOwed = Math.max(0, (Number(s.totalPurchases) || 0) - s.totalPaid)
 
-        await localDb.suppliers?.put(s).catch(() => {})
+        await localDb.suppliers?.put(s).catch(() => { })
         this.suppliers.splice(idx, 1, s)
         await this.queue('suppliers', s)
 
@@ -1186,7 +1186,7 @@ export const useShop = defineStore('shop', {
 
     async removeSupplier(id) {
       try {
-        await localDb.suppliers?.delete(id).catch(() => {})
+        await localDb.suppliers?.delete(id).catch(() => { })
         this.suppliers = this.suppliers.filter(x => x.id !== id)
         await this.queue('suppliers', { id, deleted: true })
         this.notify('Fournisseur supprimé')
@@ -1211,7 +1211,7 @@ export const useShop = defineStore('shop', {
           date: expense.date || new Date().toISOString().slice(0, 10),
           createdAt: expense.createdAt || new Date().toISOString()
         }
-        await localDb.expenses?.put(e).catch(() => {})
+        await localDb.expenses?.put(e).catch(() => { })
         const idx = this.expenses.findIndex(x => x.id === e.id)
         if (idx < 0) this.expenses.unshift(e)
         else this.expenses.splice(idx, 1, e)
@@ -1226,7 +1226,7 @@ export const useShop = defineStore('shop', {
             supplier.totalPaid = (Number(supplier.totalPaid) || 0) + amount
             supplier.balanceOwed = Math.max(0, supplier.totalPurchases - supplier.totalPaid)
 
-            await localDb.suppliers?.put(supplier).catch(() => {})
+            await localDb.suppliers?.put(supplier).catch(() => { })
             this.suppliers.splice(sIdx, 1, supplier)
             await this.queue('suppliers', supplier)
           }
@@ -1240,7 +1240,7 @@ export const useShop = defineStore('shop', {
 
     async removeExpense(id) {
       try {
-        await localDb.expenses?.delete(id).catch(() => {})
+        await localDb.expenses?.delete(id).catch(() => { })
         this.expenses = this.expenses.filter(x => x.id !== id)
         await this.queue('expenses', { id, deleted: true })
         this.notify('Dépense supprimée')

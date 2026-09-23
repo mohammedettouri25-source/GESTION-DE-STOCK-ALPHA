@@ -47,35 +47,51 @@ function generateAiReplyPHP($provider, $apiKey, $model, $systemPrompt, $userMsg)
         return "Salam! 👋 شكراً لتواصلك معنا في متجرنا. كيف يمكننا مساعدتك اليوم؟";
     }
 
-    // Google Gemini API
+    // Google Gemini API (with automatic fallback models)
     if ($provider === 'gemini') {
-        $geminiModel = (!empty($model) && strpos($model, 'gemini') !== false) ? $model : 'gemini-1.5-flash';
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$geminiModel}:generateContent?key=" . urlencode($apiKey);
+        $modelsToTry = array_unique(array_filter([
+            $model,
+            'gemini-2.5-flash',
+            'gemini-2.0-flash',
+            'gemini-1.5-flash-latest',
+            'gemini-1.5-pro',
+            'gemini-pro'
+        ]));
 
-        $payload = [
-            'contents' => [
-                [
-                    'parts' => [
-                        ['text' => $systemPrompt . "\n\nسؤال الزبون: " . $userMsg]
+        $lastError = '';
+
+        foreach ($modelsToTry as $m) {
+            $url = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent?key=" . urlencode($apiKey);
+
+            $payload = [
+                'contents' => [
+                    [
+                        'parts' => [
+                            ['text' => $systemPrompt . "\n\nسؤال الزبون: " . $userMsg]
+                        ]
                     ]
                 ]
-            ]
-        ];
+            ];
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
 
-        $result = curl_exec($ch);
-        curl_close($ch);
+            $result = curl_exec($ch);
+            curl_close($ch);
 
-        $json = json_decode($result, true);
-        if (isset($json['error']['message'])) {
-            return "⚠️ خطأ من Gemini API: " . $json['error']['message'];
+            $json = json_decode($result, true);
+            if (isset($json['candidates'][0]['content']['parts'][0]['text'])) {
+                return $json['candidates'][0]['content']['parts'][0]['text'];
+            }
+            if (isset($json['error']['message'])) {
+                $lastError = $json['error']['message'];
+            }
         }
-        return $json['candidates'][0]['content']['parts'][0]['text'] ?? "Salam! 👋 مرحباً بك في متجرنا. كيف يمكننا مساعدتك؟";
+        return "⚠️ خطأ من Gemini API: " . ($lastError ?: "تأكد من صحة المفتاح والنموذج");
     }
 
     // Groq (Llama 3)
