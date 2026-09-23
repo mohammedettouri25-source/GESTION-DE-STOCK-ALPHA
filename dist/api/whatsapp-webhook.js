@@ -21,8 +21,16 @@ ${catalogContext ? `--- قائمة المنتجات المتوفرة حاليا�
 
 ملاحظة للذكاء الاصطناعي: اجعل إجابتك وسلسة ومناسبة لتطبيق واتساب. لا تضع جداول معقدة بل استخدم قوائم مبسطة ورموز تعبيرية (Emojis) مناسبة.`
 
+  if (apiKey?.startsWith('AQ.') || apiKey?.startsWith('AIza')) {
+    provider = 'gemini'
+  } else if (apiKey?.startsWith('gsk_')) {
+    provider = 'groq'
+  } else if (apiKey?.startsWith('sk-')) {
+    provider = 'openai'
+  }
+
   // 1. OpenAI / ChatGPT
-  if (provider === 'openai' || (!provider && apiKey?.startsWith('sk-'))) {
+  if (provider === 'openai') {
     const messages = [
       { role: 'system', content: fullSystemPrompt },
       ...history.map(h => ({

@@ -47,6 +47,17 @@ function generateAiReplyPHP($provider, $apiKey, $model, $systemPrompt, $userMsg)
         return "Salam! 👋 شكراً لتواصلك معنا في متجرنا. كيف يمكننا مساعدتك اليوم؟";
     }
 
+    $apiKey = trim($apiKey);
+
+    // Auto-detect provider based on key format
+    if (strpos($apiKey, 'AQ.') === 0 || strpos($apiKey, 'AIza') === 0) {
+        $provider = 'gemini';
+    } else if (strpos($apiKey, 'gsk_') === 0) {
+        $provider = 'groq';
+    } else if (strpos($apiKey, 'sk-') === 0) {
+        $provider = 'openai';
+    }
+
     // Google Gemini API (with automatic fallback models)
     if ($provider === 'gemini') {
         $modelsToTry = array_unique(array_filter([
