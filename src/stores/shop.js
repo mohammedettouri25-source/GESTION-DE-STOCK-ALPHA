@@ -1271,7 +1271,7 @@ export const useShop = defineStore('shop', {
     async fetchWhatsAppSettings() {
       if (supabase) {
         try {
-          const { data, error } = await supabase.from('whatsapp_settings').select('*').limit(1).single()
+          const { data, error } = await supabase.from('whatsapp_settings').select('*').limit(1).maybeSingle()
           if (data && !error) {
             this.whatsappSettings = { ...this.whatsappSettings, ...data }
             localStorage.setItem('alpha-wa-phone-id', data.phone_number_id || '')
@@ -1304,7 +1304,7 @@ export const useShop = defineStore('shop', {
 
       if (supabase) {
         try {
-          const { data: existing } = await supabase.from('whatsapp_settings').select('id').limit(1).single()
+          const { data: existing } = await supabase.from('whatsapp_settings').select('id').limit(1).maybeSingle()
           if (existing?.id) {
             await supabase.from('whatsapp_settings').update({ ...settings, updated_at: new Date().toISOString() }).eq('id', existing.id)
           } else {
