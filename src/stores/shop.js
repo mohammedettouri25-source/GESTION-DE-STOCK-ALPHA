@@ -780,16 +780,18 @@ export const useShop = defineStore('shop', {
             if (existingIdx >= 0) {
               if (!salesToPut[existingIdx].number && dbS.number) salesToPut[existingIdx].number = dbS.number
             } else {
+              const existingLocal = this.sales.find(s => s.id === dbS.id)
               salesToPut.push({
+                ...(existingLocal || {}),
                 id: dbS.id,
-                number: dbS.number || '',
-                total: Number(dbS.total) || 0,
-                payment: dbS.payment_method || 'Espèces',
-                status: dbS.status || 'completed',
-                source: dbS.source || 'pos',
+                number: dbS.number || existingLocal?.number || '',
+                total: Number(dbS.total) || existingLocal?.total || 0,
+                payment: dbS.payment_method || existingLocal?.payment || 'Espèces',
+                status: dbS.status || existingLocal?.status || 'completed',
+                source: dbS.source || existingLocal?.source || 'pos',
                 confirmed: true,
-                items: [],
-                createdAt: dbS.created_at || new Date().toISOString()
+                items: existingLocal?.items || [],
+                createdAt: dbS.created_at || existingLocal?.createdAt || new Date().toISOString()
               })
             }
           }
@@ -858,20 +860,22 @@ export const useShop = defineStore('shop', {
             if (idx < 0) this.products.push(updated)
             else this.products.splice(idx, 1, updated)
           })
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, (change) => {
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, async (change) => {
             const dbS = change.new
             if (!dbS || !dbS.id) return
             if ((!dbS.number || dbS.number === '') && Number(dbS.total || 0) === 0) return
+            const existingLocal = this.sales.find(x => x.id === dbS.id) || await localDb.sales.get(dbS.id)
             const updated = {
+              ...(existingLocal || {}),
               id: dbS.id,
-              number: dbS.number || '',
-              total: Number(dbS.total) || 0,
-              payment: dbS.payment_method || 'Espèces',
-              status: dbS.status || 'completed',
-              source: dbS.source || 'pos',
+              number: dbS.number || existingLocal?.number || '',
+              total: Number(dbS.total) || existingLocal?.total || 0,
+              payment: dbS.payment_method || existingLocal?.payment || 'Espèces',
+              status: dbS.status || existingLocal?.status || 'completed',
+              source: dbS.source || existingLocal?.source || 'pos',
               confirmed: true,
-              items: [],
-              createdAt: dbS.created_at || new Date().toISOString()
+              items: existingLocal?.items || [],
+              createdAt: dbS.created_at || existingLocal?.createdAt || new Date().toISOString()
             }
             localDb.sales.put(updated)
             const idx = this.sales.findIndex(x => x.id === dbS.id)
