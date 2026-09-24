@@ -648,11 +648,21 @@ export const useShop = defineStore('shop', {
       isPulling = true
       lastPullTime = now
       try {
-        // Fetch app_sync, products, and sales concurrently in parallel to minimize latency
+        const fetchAll = async (table) => {
+          let all = []
+          for (let i = 0; i < 100; i++) {
+            const { data } = await supabase.from(table).select('*').range(i * 1000, i * 1000 + 999)
+            if (!data || !data.length) break
+            all = all.concat(data)
+            if (data.length < 1000) break
+          }
+          return { data: all }
+        }
+
         const [appSyncRes, dbProductsRes, dbSalesRes] = await Promise.allSettled([
-          supabase.from('app_sync').select('*'),
-          supabase.from('products').select('*'),
-          supabase.from('sales').select('*')
+          fetchAll('app_sync'),
+          fetchAll('products'),
+          fetchAll('sales')
         ])
 
         const data = appSyncRes.status === 'fulfilled' && !appSyncRes.value.error ? appSyncRes.value.data : null
